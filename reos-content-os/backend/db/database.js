@@ -82,6 +82,17 @@ function initDatabase() {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (content_idea_id) REFERENCES content_ideas(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS generated_images (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      content_idea_id INTEGER NOT NULL,
+      slide_number INTEGER NOT NULL,
+      image_url TEXT NOT NULL,
+      prompt TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (content_idea_id) REFERENCES content_ideas(id) ON DELETE CASCADE,
+      UNIQUE(content_idea_id, slide_number)
+    );
   `);
 
   console.log('Database initialized at:', DB_PATH);

@@ -157,7 +157,7 @@ function populateWeekSelects() {
 async function loadNews() {
   try {
     const data = await apiCall('/news');
-    state.news = data.news || [];
+    state.news = data.news || data.data || [];
     renderNewsList();
   } catch (err) {
     showToast('News konnten nicht geladen werden: ' + err.message, 'error');
@@ -166,10 +166,10 @@ async function loadNews() {
 
 async function fetchNews() {
   const weekNumber = parseInt(document.getElementById('news-week-select').value) || state.selectedWeek;
-  showLoading('Claude sucht aktuelle Immobilienmarkt-News…');
+  showLoading('Perplexity sucht aktuelle Immobilienmarkt-News…');
   try {
     const data = await apiCall('/news/fetch', { method: 'POST', body: { weekNumber } });
-    state.news = data.news || [];
+    state.news = data.news || data.data || [];
     renderNewsList();
     showToast(`${state.news.length} News-Artikel gefunden`, 'success');
   } catch (err) {
@@ -229,7 +229,7 @@ function renderNewsCard(item) {
 async function loadIdeas(weekNumber) {
   try {
     const data = await apiCall(`/content/weekly-plan/${weekNumber}`);
-    state.ideas = data.ideas || [];
+    state.ideas = data.ideas || data.data || [];
     renderIdeasGrid();
     populateBriefPostSelect();
   } catch (err) {
@@ -269,7 +269,7 @@ async function confirmGeneratePlan() {
   showLoading('Claude erstellt den Wochenplan…');
   try {
     const data = await apiCall('/content/weekly-plan', { method: 'POST', body: { newsIds, weekNumber } });
-    state.ideas = data.ideas || [];
+    state.ideas = data.ideas || data.data || [];
     state.selectedWeek = weekNumber;
     populateWeekSelects();
     renderIdeasGrid();
@@ -342,6 +342,7 @@ function updateBriefButtons() {
   const hasSelection = !!sel.value;
   document.getElementById('btn-generate-brief').disabled = !hasSelection;
   document.getElementById('btn-generate-caption').disabled = !hasSelection;
+  document.getElementById('btn-generate-images').disabled = !state.activeBriefData;
   document.getElementById('btn-copy-brief').disabled = !state.activeBriefData;
 }
 
@@ -355,10 +356,15 @@ async function openBriefForIdea(ideaId) {
 async function loadBrief(ideaId) {
   state.activeBriefIdeaId = ideaId;
   try {
-    const data = await apiCall(`/content/design-brief/${ideaId}`);
-    if (data.brief && data.brief.slides) {
-      state.activeBriefData = data.brief;
-      renderBriefSlides(data.brief.slides);
+    const [briefData, imgData] = await Promise.all([
+      apiCall(`/content/design-brief/${ideaId}`).catch(() => null),
+      apiCall(`/images/${ideaId}`).catch(() => ({ images: [] }))
+    ]);
+    const brief = briefData?.brief || briefData?.data;
+    const images = imgData?.images || [];
+    if (brief && brief.slides) {
+      state.activeBriefData = brief;
+      renderBriefSlides(brief.slides, images);
       updateBriefButtons();
     } else {
       clearBriefView();
@@ -374,11 +380,29 @@ async function generateBrief() {
   showLoading('Claude erstellt den Design-Brief…');
   try {
     const data = await apiCall(`/content/design-brief/${ideaId}`, { method: 'POST' });
-    state.activeBriefData = data.brief;
+    const brief = data.brief || data.data;
+    state.activeBriefData = brief;
     state.activeBriefIdeaId = ideaId;
-    renderBriefSlides(data.brief.slides || []);
+    renderBriefSlides(brief.slides || [], []);
     updateBriefButtons();
     showToast('Design-Brief erstellt', 'success');
+  } catch (err) {
+    showToast('Fehler: ' + err.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+async function generateImages() {
+  const ideaId = state.activeBriefIdeaId;
+  if (!ideaId) return;
+  showLoading('Bilder werden generiert (dauert ~30 Sek.)…');
+  try {
+    const data = await apiCall(`/images/generate-all/${ideaId}`, { method: 'POST' });
+    const images = data.images || [];
+    const generated = images.filter(i => i.imageUrl).length;
+    if (state.activeBriefData) renderBriefSlides(state.activeBriefData.slides || [], images);
+    showToast(`${generated} Bilder generiert`, 'success');
   } catch (err) {
     showToast('Fehler: ' + err.message, 'error');
   } finally {
@@ -392,10 +416,10 @@ async function generateCaption() {
   showLoading('Caption wird erstellt…');
   try {
     const data = await apiCall(`/content/caption/${ideaId}`, { method: 'POST' });
-    state.activeCaptionData = data.caption;
+    const cap = data.caption || data.data;
+    state.activeCaptionData = cap;
     const box = document.getElementById('brief-caption-box');
     const text = document.getElementById('brief-caption-text');
-    const cap = data.caption;
     let html = '';
     if (cap.caption_text) html += escHtml(cap.caption_text).replace(/\n/g, '<br>');
     if (cap.hashtags) html += `<br><br><strong style="color:var(--gold)">${escHtml(cap.hashtags)}</strong>`;
@@ -422,15 +446,17 @@ function clearBriefView() {
   updateBriefButtons();
 }
 
-function renderBriefSlides(slides) {
+function renderBriefSlides(slides, images = []) {
   const container = document.getElementById('brief-slides');
   const empty = document.getElementById('brief-empty');
   if (!slides || !slides.length) { clearBriefView(); return; }
   empty.style.display = 'none';
-  container.innerHTML = slides.map(slide => renderSlideCard(slide)).join('');
+  const imageMap = {};
+  images.forEach(img => { if (img.imageUrl) imageMap[img.slideNumber] = img.imageUrl; });
+  container.innerHTML = slides.map(slide => renderSlideCard(slide, imageMap[slide.slide_number])).join('');
 }
 
-function renderSlideCard(slide) {
+function renderSlideCard(slide, imageUrl) {
   const typeLabel = { cover: 'Cover', content: 'Content', cta: 'CTA' }[slide.type] || slide.type;
   const typeBadge = { cover: 'gold', content: 'blue', cta: 'green' }[slide.type] || 'gray';
   const fields = [
@@ -441,9 +467,17 @@ function renderSlideCard(slide) {
     slide.info_box && ['Info-Box', escHtml(slide.info_box).replace(/\n/g, '<br>')],
   ].filter(Boolean);
 
+  const imageHtml = imageUrl
+    ? `<div class="brief-slide-image"><img src="${escHtml(imageUrl)}" alt="Slide ${slide.slide_number}" loading="lazy" /></div>`
+    : `<div class="brief-slide-image brief-slide-image--empty">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        <span>Kein Bild</span>
+       </div>`;
+
   return `
     <div class="brief-slide">
       <div class="brief-slide-number">${slide.slide_number || '?'}</div>
+      ${imageHtml}
       <div class="brief-slide-content">
         <div class="brief-slide-type-row">
           <span class="badge badge-${typeBadge}">${typeLabel}</span>
@@ -484,8 +518,8 @@ async function loadWeekPlan(weekNumber) {
   try {
     const data = await apiCall(`/tracker/week/${weekNumber}`);
     const posts = data.posts || [];
-    const ideaData = await apiCall(`/content/weekly-plan/${weekNumber}`).catch(() => ({ ideas: [] }));
-    const ideas = ideaData.ideas || [];
+    const ideaData = await apiCall(`/content/weekly-plan/${weekNumber}`).catch(() => ({}));
+    const ideas = ideaData.ideas || ideaData.data || [];
     renderWeekCalendar(posts, ideas, weekNumber);
   } catch (err) {
     renderWeekCalendar([], [], weekNumber);
@@ -543,7 +577,7 @@ async function loadTracker() {
   try {
     const params = state.trackerFilter ? `?status=${state.trackerFilter}` : '';
     const data = await apiCall(`/tracker${params}`);
-    state.tracker = data.posts || [];
+    state.tracker = data.posts || data.data || [];
     renderTrackerTable();
   } catch (err) {
     showToast('Tracker konnte nicht geladen werden', 'error');
@@ -707,10 +741,10 @@ async function saveTrackerEntry() {
     if (state.editingTrackerId) {
       const data = await apiCall(`/tracker/${state.editingTrackerId}`, { method: 'PUT', body });
       const idx = state.tracker.findIndex(t => t.id === state.editingTrackerId);
-      if (idx !== -1) state.tracker[idx] = data.post;
+      if (idx !== -1) state.tracker[idx] = data.post || data.data;
     } else {
       const data = await apiCall('/tracker', { method: 'POST', body });
-      state.tracker.unshift(data.post);
+      state.tracker.unshift(data.post || data.data);
     }
     renderTrackerTable();
     hideModal();
@@ -788,6 +822,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('btn-generate-brief').addEventListener('click', generateBrief);
   document.getElementById('btn-generate-caption').addEventListener('click', generateCaption);
+  document.getElementById('btn-generate-images').addEventListener('click', generateImages);
   document.getElementById('btn-copy-brief').addEventListener('click', copyBriefToClipboard);
   document.getElementById('btn-copy-caption').addEventListener('click', copyCaption);
 

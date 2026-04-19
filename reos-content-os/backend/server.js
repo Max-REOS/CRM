@@ -15,6 +15,7 @@ const contentRouter = require('./routes/content');
 const canvaRouter = require('./routes/canva');
 const driveRouter = require('./routes/drive');
 const trackerRouter = require('./routes/tracker');
+const imagesRouter = require('./routes/images');
 
 // ─── App setup ─────────────────────────────────────────────────────────────────
 
@@ -48,6 +49,8 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     env: {
       anthropic: !!process.env.ANTHROPIC_API_KEY,
+      perplexity: !!process.env.PERPLEXITY_API_KEY,
+      fal: !!process.env.FAL_API_KEY,
       canva: !!process.env.CANVA_ACCESS_TOKEN,
       googleDrive: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_REFRESH_TOKEN)
     }
@@ -61,6 +64,7 @@ app.use('/api/content', contentRouter);
 app.use('/api/canva', canvaRouter);
 app.use('/api/drive', driveRouter);
 app.use('/api/tracker', trackerRouter);
+app.use('/api/images', imagesRouter);
 
 // ─── Catch-all: serve frontend index.html for client-side routing ─────────────
 
