@@ -2,21 +2,35 @@ import fs from 'fs';
 import path from 'path';
 import { Contact } from './types';
 
-const DB_PATH = path.join(process.cwd(), 'data', 'contacts.json');
+const SOURCE_PATH = path.join(process.cwd(), 'data', 'contacts.json');
+
+// Vercel's filesystem is read-only except /tmp.
+// On production, seed /tmp from the committed JSON on first use.
+const DB_PATH =
+  process.env.NODE_ENV === 'production' ? '/tmp/reos-contacts.json' : SOURCE_PATH;
+
+function ensureDb(): void {
+  if (!fs.existsSync(DB_PATH)) {
+    try {
+      const seed = fs.readFileSync(SOURCE_PATH, 'utf-8');
+      fs.writeFileSync(DB_PATH, seed, 'utf-8');
+    } catch {
+      fs.writeFileSync(DB_PATH, '[]', 'utf-8');
+    }
+  }
+}
 
 export function readContacts(): Contact[] {
   try {
-    if (!fs.existsSync(DB_PATH)) return [];
-    const data = fs.readFileSync(DB_PATH, 'utf-8');
-    return JSON.parse(data);
+    ensureDb();
+    return JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
   } catch {
     return [];
   }
 }
 
 export function writeContacts(contacts: Contact[]): void {
-  const dir = path.dirname(DB_PATH);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  ensureDb();
   fs.writeFileSync(DB_PATH, JSON.stringify(contacts, null, 2), 'utf-8');
 }
 
