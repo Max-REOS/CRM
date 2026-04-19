@@ -1,25 +1,89 @@
 'use strict';
 
-const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 
 const DB_DIR = path.join(__dirname, '..', '..', 'data');
 const DB_PATH = path.join(DB_DIR, 'reos-content-os.db');
 
-// Ensure data directory exists
-if (!fs.existsSync(DB_DIR)) {
-  fs.mkdirSync(DB_DIR, { recursive: true });
+if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
+
+let _db = null;
+
+function saveDb() {
+  if (!_db) return;
+  const data = _db.export();
+  fs.writeFileSync(DB_PATH, Buffer.from(data));
 }
 
-const db = new Database(DB_PATH);
+// Compatibility layer that mimics the better-sqlite3 synchronous API
+const db = {
+  prepare(sql) {
+    return {
+      get(...args) {
+        const params = args.flat();
+        const stmt = _db.prepare(sql);
+        if (params.length) stmt.bind(params);
+        const hasRow = stmt.step();
+        const row = hasRow ? stmt.getAsObject() : undefined;
+        stmt.free();
+        return row;
+      },
+      all(...args) {
+        const params = args.flat();
+        const stmt = _db.prepare(sql);
+        if (params.length) stmt.bind(params);
+        const rows = [];
+        while (stmt.step()) rows.push(stmt.getAsObject());
+        stmt.free();
+        return rows;
+      },
+      run(...args) {
+        const params = args.flat();
+        _db.run(sql, params.length ? params : []);
+        const lastInsertRowid = _db.exec('SELECT last_insert_rowid()')[0]?.values?.[0]?.[0] ?? 0;
+        const changes = _db.getRowsModified();
+        saveDb();
+        return { lastInsertRowid, changes };
+      }
+    };
+  },
+  transaction(fn) {
+    return (items) => {
+      _db.run('BEGIN TRANSACTION');
+      try {
+        fn(items);
+        _db.run('COMMIT');
+      } catch (e) {
+        _db.run('ROLLBACK');
+        throw e;
+      }
+      saveDb();
+    };
+  },
+  exec(sql) {
+    _db.exec(sql);
+    saveDb();
+  },
+  pragma(str) {
+    if (str === 'journal_mode = WAL') return;
+    _db.run(`PRAGMA ${str}`);
+  }
+};
 
-// Enable WAL mode for better performance
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+async function initDatabase() {
+  const initSqlJs = require('sql.js');
+  const SQL = await initSqlJs();
 
-function initDatabase() {
-  db.exec(`
+  let fileData = null;
+  if (fs.existsSync(DB_PATH)) {
+    fileData = fs.readFileSync(DB_PATH);
+  }
+
+  _db = new SQL.Database(fileData ? Buffer.from(fileData) : null);
+  _db.run('PRAGMA foreign_keys = ON');
+
+  _db.exec(`
     CREATE TABLE IF NOT EXISTS news_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       headline TEXT NOT NULL,
@@ -50,8 +114,7 @@ function initDatabase() {
       content_idea_id INTEGER NOT NULL,
       slides TEXT NOT NULL,
       design_system TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      FOREIGN KEY (content_idea_id) REFERENCES content_ideas(id) ON DELETE CASCADE
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     CREATE TABLE IF NOT EXISTS post_tracker (
@@ -68,8 +131,7 @@ function initDatabase() {
       caption TEXT,
       notes TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-      FOREIGN KEY (content_idea_id) REFERENCES content_ideas(id) ON DELETE SET NULL
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     CREATE TABLE IF NOT EXISTS captions (
@@ -79,8 +141,7 @@ function initDatabase() {
       hashtags TEXT,
       cta TEXT,
       platform TEXT NOT NULL DEFAULT 'instagram',
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      FOREIGN KEY (content_idea_id) REFERENCES content_ideas(id) ON DELETE CASCADE
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     CREATE TABLE IF NOT EXISTS generated_images (
@@ -90,11 +151,11 @@ function initDatabase() {
       image_url TEXT NOT NULL,
       prompt TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      FOREIGN KEY (content_idea_id) REFERENCES content_ideas(id) ON DELETE CASCADE,
       UNIQUE(content_idea_id, slide_number)
     );
   `);
 
+  saveDb();
   console.log('Database initialized at:', DB_PATH);
 }
 

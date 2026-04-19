@@ -121,9 +121,9 @@ app.use((err, req, res, _next) => {
 
 // ─── Start server ──────────────────────────────────────────────────────────────
 
-function start() {
+async function start() {
   try {
-    initDatabase();
+    await initDatabase();
   } catch (dbErr) {
     console.error('Failed to initialise database:', dbErr);
     process.exit(1);
