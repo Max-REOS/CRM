@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { Lead } from '@/lib/types';
 import Toast from '@/components/Toast';
 
@@ -120,12 +121,18 @@ export default function LeadsPage() {
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Lead Finder</h1>
           <p className="text-gray-500 text-sm mt-1">
-            {leads.length} vorgeladene Kaltakquise-Leads
+            {leads.length} Kaltakquise-Leads
             {uncalledCount > 0 && (
               <span className="ml-2 text-[#C9A84C]">· {uncalledCount} noch nicht angerufen</span>
             )}
           </p>
         </div>
+        <Link
+          href="/leads/new"
+          className="px-4 py-2 bg-[#C9A84C] text-black text-sm font-semibold rounded-lg hover:bg-[#D4B86A] transition-colors"
+        >
+          + Neuer Lead
+        </Link>
       </div>
 
       {/* Stats */}
