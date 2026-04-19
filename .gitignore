@@ -13,3 +13,9 @@ out/
 # Misc
 .DS_Store
 *.log
+
+# SQLite database files
+*.db
+*.db-shm
+*.db-wal
+reos-content-os/data/
