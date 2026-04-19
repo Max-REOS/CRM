@@ -9,11 +9,22 @@ const DB_PATH = path.join(DB_DIR, 'reos-content-os.db');
 if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
 
 let _db = null;
+let _inTransaction = false;
 
 function saveDb() {
   if (!_db) return;
   const data = _db.export();
   fs.writeFileSync(DB_PATH, Buffer.from(data));
+}
+
+function getLastInsertRowid() {
+  try {
+    const stmt = _db.prepare('SELECT last_insert_rowid()');
+    stmt.step();
+    const row = stmt.get();
+    stmt.free();
+    return row ? row[0] : 0;
+  } catch { return 0; }
 }
 
 // Compatibility layer that mimics the better-sqlite3 synchronous API
@@ -41,29 +52,31 @@ const db = {
       run(...args) {
         const params = args.flat();
         _db.run(sql, params.length ? params : []);
-        const lastInsertRowid = _db.exec('SELECT last_insert_rowid()')[0]?.values?.[0]?.[0] ?? 0;
+        const lastInsertRowid = getLastInsertRowid();
         const changes = _db.getRowsModified();
-        saveDb();
+        if (!_inTransaction) saveDb();
         return { lastInsertRowid, changes };
       }
     };
   },
   transaction(fn) {
     return (items) => {
+      _inTransaction = true;
       _db.run('BEGIN TRANSACTION');
       try {
         fn(items);
         _db.run('COMMIT');
       } catch (e) {
-        _db.run('ROLLBACK');
+        try { _db.run('ROLLBACK'); } catch {}
         throw e;
+      } finally {
+        _inTransaction = false;
       }
       saveDb();
     };
   },
   exec(sql) {
     _db.exec(sql);
-    saveDb();
   },
   pragma(str) {
     if (str === 'journal_mode = WAL') return;
