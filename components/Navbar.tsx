@@ -30,6 +30,9 @@ export default function Navbar() {
             >
               Kontakte
             </NavLink>
+            <NavLink href="/leads" active={pathname.startsWith('/leads')}>
+              Lead Finder
+            </NavLink>
             <Link
               href="/contacts/new"
               className="ml-3 px-4 py-1.5 bg-[#C9A84C] text-black text-sm font-semibold rounded hover:bg-[#D4B86A] transition-colors"

@@ -8,6 +8,21 @@ export type ContactStatus =
   | 'Abgeschlossen'
   | 'Abgelehnt';
 
+export interface Lead {
+  id: string;
+  company: string;
+  contactPerson: string;
+  phone: string;
+  email: string;
+  website: string;
+  city: string;
+  bundesland: string;
+  type: ContactType;
+  segment: string;
+  called: boolean;
+  notes: string;
+}
+
 export interface Contact {
   id: string;
   company: string;
