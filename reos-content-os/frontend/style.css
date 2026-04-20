@@ -156,6 +156,8 @@ ul { list-style: none; }
 
 .btn-primary { background: var(--gold); color: #000; }
 .btn-primary:hover { background: var(--gold-hover); }
+.btn-gold { background: linear-gradient(135deg, #C9A84C, #e8c96a); color: #000; font-weight: 700; box-shadow: 0 0 16px rgba(201,168,76,0.35); }
+.btn-gold:hover { background: linear-gradient(135deg, #e8c96a, #C9A84C); box-shadow: 0 0 24px rgba(201,168,76,0.5); }
 
 .btn-secondary {
   background: transparent;

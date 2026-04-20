@@ -334,7 +334,82 @@ Antworte NUR mit diesem JSON-Objekt, kein Text drumherum:
   };
 }
 
+async function generateLaunchPost(type = 'makler') {
+  const isMakler = type === 'makler';
+
+  const prompt = `Du erstellst einen Launch-Post für REOS Group — den ersten offiziellen Social-Media-Post zur Ankündigung der Plattform.
+
+${REOS_CONTEXT}
+
+AUFGABE: Erstelle einen Karussell-Post (6 Slides) speziell für ${isMakler ? 'Immobilienmakler' : 'Baufinanzierer'}.
+
+Ziel: Aufmerksamkeit erzeugen, Neugier wecken, FOMO auslösen. Dieser Post soll dazu bringen, sich für die Membership zu bewerben, BEVOR der Launch am 1. Mai 2026 passiert.
+
+Ton: Premium, exklusiv, direkt. Wie eine Einladung in einen Members-Only-Club. Nicht verkäuferisch, sondern selbstbewusst.
+
+Gib mir exakt dieses JSON-Objekt zurück (kein Text drumherum):
+{
+  "title": "Post-Titel",
+  "pillar": "Exklusivität & Launch",
+  "format": "Karussell",
+  "hook": "Erste Zeile / Hook des Posts",
+  "news_basis": "REOS Launch — 1. Mai 2026",
+  "slide_count": 6
+}`;
+
+  const response = await client.messages.create({
+    model: 'claude-opus-4-5',
+    max_tokens: 500,
+    messages: [{ role: 'user', content: prompt }]
+  });
+
+  const textBlock = response.content.find(b => b.type === 'text');
+  if (!textBlock) throw new Error('Claude returned no text');
+
+  let idea;
+  try {
+    const cleaned = stripCodeFences(textBlock.text);
+    idea = JSON.parse(cleaned);
+  } catch (err) {
+    throw new Error(`Failed to parse launch post JSON: ${err.message}`);
+  }
+
+  const weekNumber = (() => {
+    const d = new Date();
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  })();
+
+  const result = db.prepare(`
+    INSERT INTO content_ideas (week_number, day, pillar, format, title, hook, news_basis, slide_count, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'idea')
+  `).run(weekNumber, 'Launch', idea.pillar, idea.format, idea.title, idea.hook, idea.news_basis, idea.slide_count || 6);
+
+  return { ...idea, id: result.lastInsertRowid, week_number: weekNumber, day: 'Launch', status: 'idea' };
+}
+
 // ─── Routes ────────────────────────────────────────────────────────────────────
+
+/**
+ * POST /api/content/launch-post
+ * Generate a REOS launch announcement post (no news needed).
+ * Body: { type: 'makler' | 'baufi' }
+ */
+router.post('/launch-post', async (req, res) => {
+  try {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return res.status(400).json({ success: false, error: 'ANTHROPIC_API_KEY is not configured.' });
+    }
+    const type = req.body.type || 'makler';
+    const idea = await generateLaunchPost(type);
+    res.json({ success: true, data: idea });
+  } catch (err) {
+    console.error('POST /api/content/launch-post error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 /**
  * POST /api/content/weekly-plan

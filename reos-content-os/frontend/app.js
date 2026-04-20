@@ -245,6 +245,38 @@ async function loadIdeas(weekNumber) {
   }
 }
 
+async function createLaunchPost() {
+  showModal(`
+    <h2 class="modal-title">Launch Post erstellen</h2>
+    <p style="color:var(--text-muted);margin-bottom:20px">Für welche Zielgruppe soll der erste REOS-Post sein?</p>
+    <div style="display:flex;gap:12px;flex-direction:column">
+      <button class="btn btn-primary" style="padding:14px" onclick="confirmLaunchPost('makler')">
+        Immobilienmakler<br><span style="font-size:0.8rem;opacity:0.7">Bronze €1.000 / Silver €2.500 / Gold €4.000</span>
+      </button>
+      <button class="btn btn-secondary" style="padding:14px" onclick="confirmLaunchPost('baufi')">
+        Baufinanzierer<br><span style="font-size:0.8rem;opacity:0.7">Bronze €3.000 / Silver €6.000 / Gold €8.000 + Harley E-Bike</span>
+      </button>
+    </div>`, '');
+}
+
+async function confirmLaunchPost(type) {
+  hideModal();
+  showLoading('Claude erstellt Launch Post…');
+  try {
+    const data = await apiCall('/content/launch-post', { method: 'POST', body: { type } });
+    const idea = data.data;
+    state.ideas.unshift(idea);
+    renderIdeasGrid();
+    populateBriefPostSelect();
+    showToast('Launch Post erstellt — Brief generieren!', 'success');
+    await openBriefForIdea(idea.id);
+  } catch (err) {
+    showToast('Fehler: ' + err.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
 function showNewsPicker() {
   if (!state.news.length) {
     showToast('Bitte zuerst News laden (Tab "News")', 'info');
@@ -813,6 +845,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('news-week-select').addEventListener('change', e => { state.selectedWeek = parseInt(e.target.value); });
 
   // Ideas tab
+  document.getElementById('btn-launch-post').addEventListener('click', createLaunchPost);
   document.getElementById('btn-generate-plan').addEventListener('click', showNewsPicker);
   document.getElementById('btn-cancel-plan').addEventListener('click', hideNewsPicker);
   document.getElementById('btn-confirm-generate').addEventListener('click', confirmGeneratePlan);
