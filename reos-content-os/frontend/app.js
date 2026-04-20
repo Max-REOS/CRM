@@ -1004,7 +1004,7 @@ async function renderSlideCanvas(slide, imageUrl, totalSlides) {
   // Background image
   if (imageUrl) {
     try {
-      const img = await loadCanvasImage(`/api/images/proxy?url=${encodeURIComponent(imageUrl)}`);
+      const img = await loadCanvasImage(imageUrl);
       const scale = Math.max(S / img.width, S / img.height);
       const w = img.width * scale, h = img.height * scale;
       ctx.drawImage(img, (S - w) / 2, (S - h) / 2, w, h);
@@ -1093,13 +1093,17 @@ async function renderSlideCanvas(slide, imageUrl, totalSlides) {
   return canvas;
 }
 
-function loadCanvasImage(src) {
+async function loadCanvasImage(url) {
+  const proxyUrl = `/api/images/proxy?url=${encodeURIComponent(url)}`;
+  const response = await fetch(proxyUrl);
+  if (!response.ok) throw new Error(`Image fetch failed: ${response.status}`);
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = src;
+    img.onload = () => { URL.revokeObjectURL(objectUrl); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('decode failed')); };
+    img.src = objectUrl;
   });
 }
 
