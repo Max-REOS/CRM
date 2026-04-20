@@ -41,6 +41,24 @@ async function generateImage(prompt, slideNumber = 1) {
   return imageUrl;
 }
 
+// GET /api/images/proxy?url=<encoded>
+router.get('/proxy', async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).send('url required');
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return res.status(response.status).send('upstream error');
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    const buffer = await response.arrayBuffer();
+    res.send(Buffer.from(buffer));
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
 // POST /api/images/generate
 // Body: { prompt, ideaId, slideNumber }
 router.post('/generate', async (req, res) => {

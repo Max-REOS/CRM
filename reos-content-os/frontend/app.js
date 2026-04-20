@@ -443,6 +443,7 @@ function updateBriefButtons() {
   document.getElementById('btn-generate-brief').disabled = !hasSelection;
   document.getElementById('btn-generate-caption').disabled = !hasSelection;
   document.getElementById('btn-generate-images').disabled = !state.activeBriefData;
+  document.getElementById('btn-export-slides').disabled = !state.activeBriefData;
   document.getElementById('btn-copy-brief').disabled = !state.activeBriefData;
 }
 
@@ -935,6 +936,192 @@ function updateHeaderStatus(status) {
   });
 }
 
+// ─── SLIDE EXPORT (Canvas → ZIP) ─────────────────────────────────────────────
+
+async function exportSlides() {
+  if (!state.activeBriefData || !state.activeBriefIdeaId) return;
+  const slides = state.activeBriefData.slides || [];
+
+  const imgData = await apiCall(`/images/${state.activeBriefIdeaId}`).catch(() => ({ images: [] }));
+  const images = imgData.images || [];
+  const imageMap = {};
+  images.forEach(img => { if (img.image_url) imageMap[img.slide_number] = img.image_url; });
+
+  const hasImages = Object.keys(imageMap).length > 0;
+  if (!hasImages) {
+    showToast('Bitte zuerst Bilder generieren', 'error');
+    return;
+  }
+
+  showLoading(`Slides werden gerendert (${slides.length} Bilder)…`);
+  try {
+    const zip = new JSZip();
+    const total = slides.length;
+
+    for (let i = 0; i < total; i++) {
+      const slide = slides[i];
+      document.getElementById('loading-message').textContent = `Slide ${i + 1} von ${total} wird gerendert…`;
+      const canvas = await renderSlideCanvas(slide, imageMap[slide.slide_number], total);
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.93));
+      zip.file(`reos_slide_${String(slide.slide_number).padStart(2, '0')}.jpg`, blob);
+    }
+
+    if (state.activeCaptionData) {
+      const cap = state.activeCaptionData;
+      const txt = [cap.caption_text, '', cap.hashtags || '', cap.cta ? `\nCTA: ${cap.cta}` : ''].filter(Boolean).join('\n');
+      zip.file('caption.txt', txt);
+    }
+
+    const idea = state.ideas.find(i => i.id == state.activeBriefIdeaId);
+    const titleSlug = (idea?.title || 'reos-post').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40);
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${titleSlug}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(`${total} Slides + Caption exportiert`, 'success');
+  } catch (err) {
+    showToast('Export fehlgeschlagen: ' + err.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+async function renderSlideCanvas(slide, imageUrl, totalSlides) {
+  const S = 1080;
+  const canvas = document.createElement('canvas');
+  canvas.width = S; canvas.height = S;
+  const ctx = canvas.getContext('2d');
+
+  // Background
+  ctx.fillStyle = '#0A0A0A';
+  ctx.fillRect(0, 0, S, S);
+
+  // Background image
+  if (imageUrl) {
+    try {
+      const img = await loadCanvasImage(`/api/images/proxy?url=${encodeURIComponent(imageUrl)}`);
+      const scale = Math.max(S / img.width, S / img.height);
+      const w = img.width * scale, h = img.height * scale;
+      ctx.drawImage(img, (S - w) / 2, (S - h) / 2, w, h);
+    } catch {}
+  }
+
+  // Gradient overlay — dark at bottom for text
+  const grad = ctx.createLinearGradient(0, 0, 0, S);
+  grad.addColorStop(0, 'rgba(10,10,10,0.35)');
+  grad.addColorStop(0.45, 'rgba(10,10,10,0.55)');
+  grad.addColorStop(1, 'rgba(10,10,10,0.92)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, S, S);
+
+  // Gold accent bar top-left
+  ctx.fillStyle = '#C9A84C';
+  ctx.fillRect(60, 64, 140, 3);
+
+  // Slide type label
+  const typeLabel = { cover: 'COVER', content: 'CONTENT', cta: 'CTA' }[slide.type] || 'SLIDE';
+  ctx.font = '500 22px system-ui, sans-serif';
+  ctx.fillStyle = 'rgba(201,168,76,0.75)';
+  ctx.textAlign = 'left';
+  ctx.fillText(`${typeLabel}  ·  ${slide.slide_number}/${totalSlides}`, 60, 106);
+
+  let y = 190;
+
+  // Hero element
+  if (slide.hero_element) {
+    ctx.font = 'bold 108px system-ui, sans-serif';
+    ctx.fillStyle = '#C9A84C';
+    y = wrapCanvasText(ctx, slide.hero_element, 60, y, S - 120, 118) + 10;
+  }
+
+  // Headline
+  if (slide.headline) {
+    ctx.font = 'bold 54px system-ui, sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+    y = wrapCanvasText(ctx, slide.headline, 60, y, S - 120, 66, 3) + 24;
+  }
+
+  // Body text
+  if (slide.body_text) {
+    ctx.font = '400 30px system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.82)';
+    y = wrapCanvasText(ctx, slide.body_text, 60, y, S - 120, 42, 5) + 20;
+  }
+
+  // Info box
+  if (slide.info_box && y < S - 200) {
+    const boxH = 64;
+    ctx.fillStyle = 'rgba(201,168,76,0.12)';
+    ctx.strokeStyle = 'rgba(201,168,76,0.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.rect(60, y, S - 120, boxH);
+    ctx.fill(); ctx.stroke();
+    ctx.font = '500 26px system-ui, sans-serif';
+    ctx.fillStyle = '#C9A84C';
+    const infoTxt = slide.info_box.length > 65 ? slide.info_box.slice(0, 62) + '…' : slide.info_box;
+    ctx.fillText(infoTxt, 80, y + 40);
+  }
+
+  // Bottom bar
+  ctx.fillStyle = 'rgba(10,10,10,0.6)';
+  ctx.fillRect(0, S - 90, S, 90);
+
+  // REOS wordmark
+  ctx.font = 'bold 32px system-ui, sans-serif';
+  ctx.fillStyle = '#C9A84C';
+  ctx.textAlign = 'left';
+  ctx.fillText('REOS', 60, S - 32);
+
+  // Progress dots
+  const dotR = 5, dotGap = 18;
+  const dotsW = totalSlides * (dotR * 2) + (totalSlides - 1) * (dotGap - dotR * 2);
+  let dx = S - 60 - dotsW;
+  for (let i = 0; i < totalSlides; i++) {
+    ctx.beginPath();
+    ctx.arc(dx + dotR, S - 38, dotR, 0, Math.PI * 2);
+    ctx.fillStyle = i === slide.slide_number - 1 ? '#C9A84C' : 'rgba(255,255,255,0.3)';
+    ctx.fill();
+    dx += dotGap;
+  }
+
+  return canvas;
+}
+
+function loadCanvasImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+function wrapCanvasText(ctx, text, x, y, maxWidth, lineH, maxLines = 99) {
+  const words = text.replace(/\n/g, ' \n ').split(' ');
+  let line = '', lines = 0;
+  for (const word of words) {
+    if (word === '\n') {
+      if (lines >= maxLines) break;
+      ctx.fillText(line.trim(), x, y); line = ''; y += lineH; lines++;
+      continue;
+    }
+    const test = line ? line + ' ' + word : word;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      if (lines >= maxLines) break;
+      ctx.fillText(line.trim(), x, y); line = word; y += lineH; lines++;
+    } else { line = test; }
+  }
+  if (line && lines < maxLines) { ctx.fillText(line.trim(), x, y); y += lineH; }
+  return y;
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   populateWeekSelects();
@@ -964,6 +1151,7 @@ document.addEventListener('DOMContentLoaded', () => {
     else clearBriefView();
     updateBriefButtons();
   });
+  document.getElementById('btn-export-slides').addEventListener('click', exportSlides);
   document.getElementById('btn-generate-brief').addEventListener('click', generateBrief);
   document.getElementById('btn-generate-caption').addEventListener('click', generateCaption);
   document.getElementById('btn-generate-images').addEventListener('click', generateImages);
