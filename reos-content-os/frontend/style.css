@@ -469,6 +469,20 @@ label.form-label { display: block; font-size: 0.78rem; color: var(--text-muted);
 .brief-field-value strong { color: var(--text); }
 .brief-hero { font-size: 1.4rem; font-weight: 800; color: var(--gold); }
 .brief-photo-prompt { font-style: italic; }
+
+.brief-field-prompt { flex-direction: column; align-items: flex-start; gap: 6px; }
+.brief-field-prompt-header { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+.btn-edit-prompt {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 0.72rem; color: var(--text-dim); padding: 3px 8px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: transparent; cursor: pointer; transition: all var(--transition);
+}
+.btn-edit-prompt:hover { color: var(--gold); border-color: var(--gold-dim); background: var(--gold-dim); }
+.prompt-edit-box { width: 100%; }
+.prompt-textarea { width: 100%; font-size: 0.82rem; min-height: 70px; resize: vertical; }
+.prompt-edit-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
+
 .brief-design-notes {
   background: rgba(201,168,76,0.06);
   border-left: 2px solid var(--gold);

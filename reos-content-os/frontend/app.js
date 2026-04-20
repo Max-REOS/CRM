@@ -245,31 +245,92 @@ async function loadIdeas(weekNumber) {
   }
 }
 
-async function createLaunchPost() {
+function createREOSPost() {
   showModal(`
-    <h2 class="modal-title">Launch Post erstellen</h2>
-    <p style="color:var(--text-muted);margin-bottom:20px">Für welche Zielgruppe soll der erste REOS-Post sein?</p>
-    <div style="display:flex;gap:12px;flex-direction:column">
-      <button class="btn btn-primary" style="padding:14px" onclick="confirmLaunchPost('makler')">
-        Immobilienmakler<br><span style="font-size:0.8rem;opacity:0.7">Bronze €1.000 / Silver €2.500 / Gold €4.000</span>
-      </button>
-      <button class="btn btn-secondary" style="padding:14px" onclick="confirmLaunchPost('baufi')">
-        Baufinanzierer<br><span style="font-size:0.8rem;opacity:0.7">Bronze €3.000 / Silver €6.000 / Gold €8.000 + Harley E-Bike</span>
-      </button>
+    <h2 class="modal-title" style="color:var(--gold);margin-bottom:6px">REOS Post erstellen</h2>
+    <p style="color:var(--text-muted);margin-bottom:20px;font-size:0.85rem">Gib vor, was Claude posten soll — du hast die volle Kontrolle.</p>
+    <div class="form-grid">
+      <div>
+        <label class="form-label">Thema / Inhalt *</label>
+        <textarea class="textarea" id="rp-thema" rows="3" placeholder="z.B. Die 3 größten Vorteile der REOS Membership für Makler — schnellere Abschlüsse durch vorqualifizierte Leads..."></textarea>
+      </div>
+      <div class="form-row">
+        <div>
+          <label class="form-label">Post-Typ</label>
+          <select class="select" id="rp-type">
+            <option value="Exklusivität & Launch">Launch Announcement</option>
+            <option value="Makler-Know-how">Vorteile für Makler</option>
+            <option value="Baufinanzierer-Know-how">Vorteile für Baufinanzierer</option>
+            <option value="Markt & Zahlen">Fakten & Zahlen</option>
+            <option value="Pain Points">Pain Points</option>
+            <option value="Exklusivität & Launch">FOMO / Members Only</option>
+            <option value="Markt & Zahlen">Preise & Membership</option>
+            <option value="Exklusivität & Launch">Behind the Scenes</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Zielgruppe</label>
+          <select class="select" id="rp-audience">
+            <option value="Immobilienmakler">Immobilienmakler</option>
+            <option value="Baufinanzierer">Baufinanzierer</option>
+            <option value="Beide Zielgruppen">Beide</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="form-label">Anweisungen an Claude <span style="opacity:0.5">(optional)</span></label>
+        <textarea class="textarea" id="rp-instructions" rows="2" placeholder="z.B. Betone die Joining Fee, erwähne das Harley E-Bike, nutze konkrete Zahlen, schreibe einen starken FOMO-Hook..."></textarea>
+      </div>
+      <div>
+        <label class="form-label">Bild-Stil Vorgabe <span style="opacity:0.5">(optional)</span></label>
+        <input class="input" id="rp-bildhinweis" type="text" placeholder="z.B. Porsche GT3 bei Nacht, nasse Straße, Stadtlicht — oder: dunkle Bibliothek mit Leder..." />
+      </div>
+      <div>
+        <label class="form-label">Anzahl Slides</label>
+        <select class="select" id="rp-slides" style="width:140px">
+          <option value="4">4 Slides</option>
+          <option value="5">5 Slides</option>
+          <option value="6" selected>6 Slides</option>
+          <option value="7">7 Slides</option>
+          <option value="8">8 Slides</option>
+        </select>
+      </div>
+      <div class="form-footer" style="margin-top:8px">
+        <button class="btn btn-secondary" onclick="hideModal()">Abbrechen</button>
+        <button class="btn btn-gold" onclick="confirmREOSPost()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:6px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          Post + Brief erstellen
+        </button>
+      </div>
     </div>`, '');
 }
 
-async function confirmLaunchPost(type) {
+async function confirmREOSPost() {
+  const thema = document.getElementById('rp-thema').value.trim();
+  if (!thema) { showToast('Bitte ein Thema eingeben', 'error'); return; }
+  const body = {
+    thema,
+    postType: document.getElementById('rp-type').value,
+    zielgruppe: document.getElementById('rp-audience').value,
+    instructions: document.getElementById('rp-instructions').value.trim(),
+    slideCount: document.getElementById('rp-slides').value,
+    bildHinweis: document.getElementById('rp-bildhinweis').value.trim()
+  };
   hideModal();
-  showLoading('Claude erstellt Launch Post…');
+  showLoading('Claude erstellt REOS Post + Design-Brief…');
   try {
-    const data = await apiCall('/content/launch-post', { method: 'POST', body: { type } });
-    const idea = data.data;
+    const data = await apiCall('/content/reos-post', { method: 'POST', body });
+    const { idea, brief } = data.data;
     state.ideas.unshift(idea);
     renderIdeasGrid();
     populateBriefPostSelect();
-    showToast('Launch Post erstellt — Brief generieren!', 'success');
-    await openBriefForIdea(idea.id);
+    state.activeBriefData = brief;
+    state.activeBriefIdeaId = idea.id;
+    switchTab('brief');
+    document.getElementById('brief-post-select').value = idea.id;
+    renderBriefSlides(brief.slides || [], []);
+    updateBriefButtons();
+    showToast('Post + Brief erstellt — Prompts prüfen, dann Bilder generieren!', 'success');
   } catch (err) {
     showToast('Fehler: ' + err.message, 'error');
   } finally {
@@ -498,8 +559,8 @@ function renderBriefSlides(slides, images = []) {
 function renderSlideCard(slide, imageUrl) {
   const typeLabel = { cover: 'Cover', content: 'Content', cta: 'CTA' }[slide.type] || slide.type;
   const typeBadge = { cover: 'gold', content: 'blue', cta: 'green' }[slide.type] || 'gray';
+  const sn = slide.slide_number;
   const fields = [
-    slide.photo_prompt && ['Foto-Prompt', `<span class="brief-photo-prompt">${escHtml(slide.photo_prompt)}</span>`],
     slide.hero_element && ['Hero-Element', `<span class="brief-hero">${escHtml(slide.hero_element)}</span>`],
     slide.headline && ['Headline', `<strong>${escHtml(slide.headline)}</strong>`],
     slide.body_text && ['Body-Text', escHtml(slide.body_text).replace(/\n/g, '<br>')],
@@ -507,20 +568,37 @@ function renderSlideCard(slide, imageUrl) {
   ].filter(Boolean);
 
   const imageHtml = imageUrl
-    ? `<div class="brief-slide-image"><img src="${escHtml(imageUrl)}" alt="Slide ${slide.slide_number}" loading="lazy" /></div>`
+    ? `<div class="brief-slide-image"><img src="${escHtml(imageUrl)}" alt="Slide ${sn}" loading="lazy" /></div>`
     : `<div class="brief-slide-image brief-slide-image--empty">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
         <span>Kein Bild</span>
        </div>`;
 
   return `
-    <div class="brief-slide">
-      <div class="brief-slide-number">${slide.slide_number || '?'}</div>
+    <div class="brief-slide" id="slide-card-${sn}">
+      <div class="brief-slide-number">${sn || '?'}</div>
       ${imageHtml}
       <div class="brief-slide-content">
         <div class="brief-slide-type-row">
           <span class="badge badge-${typeBadge}">${typeLabel}</span>
           ${slide.title ? `<span class="brief-slide-title">${escHtml(slide.title)}</span>` : ''}
+        </div>
+        <div class="brief-field brief-field-prompt">
+          <div class="brief-field-prompt-header">
+            <span class="brief-field-label">Foto-Prompt</span>
+            <button class="btn-edit-prompt" onclick="toggleEditPrompt(${sn})" title="Prompt bearbeiten">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Bearbeiten
+            </button>
+          </div>
+          <span class="brief-field-value brief-photo-prompt" id="prompt-display-${sn}">${escHtml(slide.photo_prompt || '')}</span>
+          <div class="prompt-edit-box" id="prompt-edit-${sn}" style="display:none">
+            <textarea class="textarea prompt-textarea" id="prompt-input-${sn}" rows="3">${escHtml(slide.photo_prompt || '')}</textarea>
+            <div class="prompt-edit-actions">
+              <button class="btn btn-secondary btn-xs" onclick="toggleEditPrompt(${sn})">Abbrechen</button>
+              <button class="btn btn-primary btn-xs" onclick="savePrompt(${sn})">Speichern</button>
+            </div>
+          </div>
         </div>
         ${fields.map(([label, value]) => `
           <div class="brief-field">
@@ -530,6 +608,32 @@ function renderSlideCard(slide, imageUrl) {
         ${slide.design_notes ? `<div class="brief-design-notes">${escHtml(slide.design_notes).replace(/\n/g, '<br>')}</div>` : ''}
       </div>
     </div>`;
+}
+
+function toggleEditPrompt(slideNumber) {
+  const display = document.getElementById(`prompt-display-${slideNumber}`);
+  const editBox = document.getElementById(`prompt-edit-${slideNumber}`);
+  const isEditing = editBox.style.display !== 'none';
+  display.style.display = isEditing ? '' : 'none';
+  editBox.style.display = isEditing ? 'none' : 'block';
+  if (!isEditing) document.getElementById(`prompt-input-${slideNumber}`).focus();
+}
+
+async function savePrompt(slideNumber) {
+  if (!state.activeBriefData || !state.activeBriefIdeaId) return;
+  const newPrompt = document.getElementById(`prompt-input-${slideNumber}`).value.trim();
+  const slides = state.activeBriefData.slides.map(s =>
+    s.slide_number === slideNumber ? { ...s, photo_prompt: newPrompt } : s
+  );
+  try {
+    await apiCall(`/content/design-brief/${state.activeBriefIdeaId}`, { method: 'PUT', body: { slides } });
+    state.activeBriefData = { ...state.activeBriefData, slides };
+    document.getElementById(`prompt-display-${slideNumber}`).textContent = newPrompt;
+    toggleEditPrompt(slideNumber);
+    showToast('Prompt gespeichert', 'success');
+  } catch (err) {
+    showToast('Fehler beim Speichern: ' + err.message, 'error');
+  }
 }
 
 function copyBriefToClipboard() {
@@ -845,7 +949,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('news-week-select').addEventListener('change', e => { state.selectedWeek = parseInt(e.target.value); });
 
   // Ideas tab
-  document.getElementById('btn-launch-post').addEventListener('click', createLaunchPost);
+  document.getElementById('btn-reos-post').addEventListener('click', createREOSPost);
   document.getElementById('btn-generate-plan').addEventListener('click', showNewsPicker);
   document.getElementById('btn-cancel-plan').addEventListener('click', hideNewsPicker);
   document.getElementById('btn-confirm-generate').addEventListener('click', confirmGeneratePlan);

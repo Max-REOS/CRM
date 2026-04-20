@@ -394,8 +394,6 @@ Gib mir exakt dieses JSON-Objekt zurück (kein Text drumherum):
 
 /**
  * POST /api/content/launch-post
- * Generate a REOS launch announcement post (no news needed).
- * Body: { type: 'makler' | 'baufi' }
  */
 router.post('/launch-post', async (req, res) => {
   try {
@@ -407,6 +405,129 @@ router.post('/launch-post', async (req, res) => {
     res.json({ success: true, data: idea });
   } catch (err) {
     console.error('POST /api/content/launch-post error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/content/reos-post
+ * Fully manual REOS post creator with custom inputs.
+ * Body: { thema, postType, zielgruppe, instructions, slideCount, bildHinweis }
+ */
+router.post('/reos-post', async (req, res) => {
+  try {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return res.status(400).json({ success: false, error: 'ANTHROPIC_API_KEY is not configured.' });
+    }
+    const { thema, postType, zielgruppe, instructions, slideCount, bildHinweis } = req.body;
+    if (!thema) return res.status(400).json({ success: false, error: 'thema ist erforderlich' });
+
+    const slideCountNum = Math.min(Math.max(Number(slideCount) || 6, 3), 8);
+    const bildHinweisText = bildHinweis
+      ? `\nBILD-STIL VORGABE DES NUTZERS: "${bildHinweis}" — Integriere diese Vorgabe in die photo_prompts der Slides.`
+      : '';
+
+    const prompt = `Du erstellst einen detaillierten Canva-Design-Brief für REOS Group.
+
+${REOS_CONTEXT}
+
+POST-DETAILS (vom Nutzer vorgegeben):
+THEMA / INHALT: ${thema}
+POST-TYP: ${postType || 'REOS Vorteile'}
+ZIELGRUPPE: ${zielgruppe || 'Immobilienmakler'}
+SPEZIELLE ANWEISUNGEN: ${instructions || 'Keine speziellen Anweisungen'}
+ANZAHL SLIDES: ${slideCountNum}
+${bildHinweisText}
+
+DESIGN SYSTEM:
+- Schwarz (#0A0A0A) + Gold (#C9A84C), Full-bleed Foto + dunkles Overlay
+- Hero-Element: große Zahl/Begriff, weiß oder gold
+- Headlines: clean sans-serif, weiß, bold
+- Foto-Stil: ultra-dunkle Luxury — Porsche/Ferrari bei Nacht, Stadtskylinen, dunkle elegante Architektur, Penthouse, dramatische Beleuchtung. Wie tuxedosociety. Keine Menschen. Prompts auf Englisch für fal.ai.
+
+Erstelle ein JSON-Array mit exakt ${slideCountNum} Slides (Cover → Content-Slides → CTA):
+[
+  {
+    "slide_number": 1,
+    "type": "cover",
+    "photo_prompt": "English prompt for fal.ai Flux Pro image generation",
+    "hero_element": "Big number or key element",
+    "headline": "Main headline",
+    "body_text": "Body text / bullet points",
+    "info_box": "Gold info box text (optional, empty if not needed)",
+    "design_notes": "Specific design instructions"
+  }
+]
+Antworte NUR mit dem JSON-Array, kein Text drumherum.`;
+
+    const response = await client.messages.create({
+      model: 'claude-opus-4-5',
+      max_tokens: 6000,
+      messages: [{ role: 'user', content: prompt }]
+    });
+
+    const textBlock = response.content.find(b => b.type === 'text');
+    if (!textBlock) throw new Error('Claude returned no text');
+
+    const cleaned = stripCodeFences(textBlock.text);
+    let slides;
+    try {
+      slides = JSON.parse(cleaned);
+    } catch (err) {
+      throw new Error(`Failed to parse REOS post JSON: ${err.message}`);
+    }
+    if (!Array.isArray(slides)) throw new Error('Response is not an array');
+
+    const weekNumber = (() => {
+      const d = new Date();
+      const dayNum = d.getUTCDay() || 7;
+      d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    })();
+
+    const ideaResult = db.prepare(`
+      INSERT INTO content_ideas (week_number, day, pillar, format, title, hook, news_basis, slide_count, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'idea')
+    `).run(weekNumber, 'REOS', postType || 'REOS Vorteile', 'Karussell', thema, slides[0]?.headline || thema, zielgruppe || 'Immobilienmakler', slideCountNum);
+
+    const ideaId = ideaResult.lastInsertRowid;
+
+    db.prepare('DELETE FROM design_briefs WHERE content_idea_id = ?').run(ideaId);
+    const briefResult = db.prepare(`
+      INSERT INTO design_briefs (content_idea_id, slides, design_system) VALUES (?, ?, ?)
+    `).run(ideaId, JSON.stringify(slides), JSON.stringify(DESIGN_SYSTEM));
+
+    res.json({
+      success: true,
+      data: {
+        idea: { id: ideaId, week_number: weekNumber, day: 'REOS', pillar: postType || 'REOS Vorteile', format: 'Karussell', title: thema, hook: slides[0]?.headline || thema, news_basis: zielgruppe || 'Immobilienmakler', slide_count: slideCountNum, status: 'idea' },
+        brief: { id: briefResult.lastInsertRowid, content_idea_id: ideaId, slides, design_system: DESIGN_SYSTEM }
+      }
+    });
+  } catch (err) {
+    console.error('POST /api/content/reos-post error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * PUT /api/content/design-brief/:ideaId
+ * Save edited slides (e.g. after user edits photo prompts).
+ * Body: { slides: [...] }
+ */
+router.put('/design-brief/:ideaId', (req, res) => {
+  try {
+    const ideaId = Number(req.params.ideaId);
+    const { slides } = req.body;
+    if (!slides || !Array.isArray(slides)) {
+      return res.status(400).json({ success: false, error: 'slides array required' });
+    }
+    const brief = db.prepare('SELECT id FROM design_briefs WHERE content_idea_id = ? ORDER BY created_at DESC LIMIT 1').get(ideaId);
+    if (!brief) return res.status(404).json({ success: false, error: 'Brief not found' });
+    db.prepare('UPDATE design_briefs SET slides = ? WHERE id = ?').run(JSON.stringify(slides), brief.id);
+    res.json({ success: true });
+  } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
