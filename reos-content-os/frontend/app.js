@@ -61,7 +61,14 @@ function escHtml(str) {
 }
 
 function pillarBadge(pillar) {
-  const map = { Credibility: 'blue', Conversion: 'orange', Reach: 'green' };
+  const map = {
+    'Markt & Zahlen': 'blue',
+    'Makler-Know-how': 'orange',
+    'Baufinanzierer-Know-how': 'green',
+    'Exklusivität & Launch': 'gold',
+    'Pain Points': 'red',
+    Credibility: 'blue', Conversion: 'orange', Reach: 'green'
+  };
   const cls = map[pillar] || 'gray';
   return `<span class="badge badge-${cls}">${escHtml(pillar)}</span>`;
 }
@@ -669,7 +676,7 @@ function trackerFormHtml(post) {
           <label class="form-label">Säule</label>
           <select class="select" id="tf-pillar">
             <option value="">–</option>
-            ${['Credibility','Conversion','Reach'].map(p => `<option${v('pillar')===p?' selected':''}>${p}</option>`).join('')}
+            ${['Markt & Zahlen','Makler-Know-how','Baufinanzierer-Know-how','Exklusivität & Launch','Pain Points'].map(p => `<option${v('pillar')===p?' selected':''}>${p}</option>`).join('')}
           </select>
         </div>
         <div>
