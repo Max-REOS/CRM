@@ -31,9 +31,45 @@ const DESIGN_SYSTEM = {
   ]
 };
 
-/**
- * Strips markdown code fences from a string.
- */
+// ─── REOS Brand Context (embedded in all prompts) ──────────────────────────────
+const REOS_CONTEXT = `
+REOS GROUP — VOLLSTÄNDIGER BRAND-KONTEXT:
+
+Was ist REOS?
+REOS ist eine exklusive B2B-Membership-Plattform, die Immobilienmakler und Baufinanzierer in Deutschland strukturiert zusammenbringt. Launch: 1. Mai 2026. München-basiert, deutschlandweit. "Members Only – by application." Pre-Launch-Phase.
+
+ZIELGRUPPE 1 — IMMOBILIENMAKLER:
+Hauptproblem: Unqualifizierte Kaufinteressenten ohne bestätigte Finanzierung kosten Zeit und Nerven. Abschlüsse scheitern spät im Prozess an der Finanzierung.
+REOS-Lösung: Strukturierte, verlässliche Baufinanzierungspartner direkt im Netzwerk. Vorqualifizierte Leads mit bestätigter Kaufabsicht. Tandem-Partnerschaft mit festem Baufinanzierer. Schnellere Abschlüsse, weniger Leerläufe.
+Preise: Bronze €1.000/Mo | Silver €2.500/Mo | Gold €4.000/Mo + €3.500 Joining Fee | 6 Monate Mindestlaufzeit
+
+ZIELGRUPPE 2 — BAUFINANZIERER:
+Hauptproblem: Kaltakquise, unqualifizierte Anfragen, keine festen Partnerstrukturen mit Maklern.
+REOS-Lösung: Qualifizierte Kaufinteressenten mit konkretem Objekt und bestätigter Kaufabsicht landen direkt beim Berater. Keine Kaltakquise. Feste Maklerpartner. Mehr Abschlüsse pro Monat.
+Welcome Gift: Harley Davidson E-Bike bei Beitritt.
+Preise: Bronze €3.000/Mo | Silver €6.000/Mo | Gold €8.000/Mo + €3.500 Joining Fee + Harley Davidson E-Bike | 6 Monate Mindestlaufzeit | 1. Quartalszahlung upfront
+
+POSITIONIERUNG:
+- Premium, exklusiv, "by application only" — nicht jeder kommt rein
+- Kein Social-Media-Guru-Stil, keine Floskeln
+- Ton: direkt, professionell, auf Augenhöhe mit erfolgreichen Unternehmern
+- Keine unverifizierten Statistiken verwenden (Pre-Launch)
+- Stattdessen: Marktdaten, Branchenzahlen, Pain Points, Exklusivitäts-Framing
+- Launch-Countdown und FOMO nutzen (Launch 1. Mai 2026)
+- Referenz-Ästhetik: tuxedosociety (Ultra-Luxury Members Club), niksetting (Unternehmer-Content)
+
+DESIGN:
+- Schwarz (#0A0A0A) + Gold (#C9A84C)
+- Dunkle, cineastische Fotos: Skyline bei Nacht, dunkle Bibliothek, Luxusautos bei Nacht, edle Architektur
+- Vollbild-Foto + dunkles Overlay + goldene Elemente
+
+CONTENT-PILLARS:
+- Markt & Zahlen: Datenbasierte Marktanalysen als Credibility-Aufbau
+- Makler-Know-how: Konkrete Vorteile für Makler durch REOS-Membership
+- Baufinanzierer-Know-how: Konkrete Vorteile für Baufinanzierer durch REOS
+- Exklusivität & Launch: Members Only, by application, Countdown zum 1. Mai 2026
+- Pain Points: Die echten Probleme die REOS löst
+`.trim();
 function stripCodeFences(text) {
   return text
     .replace(/^```(?:json)?\s*/i, '')
@@ -51,16 +87,11 @@ async function generateWeeklyPlan(newsItems, weekNumber) {
     `[${i + 1}] "${n.headline}" (${n.source}, ${n.date}) — Key data: ${n.key_data}`
   ).join('\n');
 
-  const systemPrompt = `Du bist der REOS Content Stratege. Du erstellst Inhaltsstrategien für REOS Group, eine B2B-Plattform, die deutschen Immobilienmaklern hilft, mehr Kunden zu gewinnen und zu binden.
+  const systemPrompt = `Du bist der REOS Content Stratege. Erstelle hochwertige, konvertierende Social-Media-Posts für REOS Group.
 
-Tonalität: direkt, professionell, auf Augenhöhe mit erfahrenen Maklern. Keine Floskeln, keine Übertreibungen. Klarer Mehrwert pro Post.
+${REOS_CONTEXT}
 
-Content-Pillars:
-- Markt & Zahlen: Datenbasierte Marktanalysen, EPX-Index, Preistrends
-- Makler-Know-how: Tools, Tipps, Prozesse für mehr Effizienz
-- Kundenkommunikation: Wie Makler besser mit Käufern/Verkäufern kommunizieren
-- REOS Features: Konkrete Vorteile der REOS-Plattform im Alltag
-- Motivation & Mindset: Erfolgsgeschichten, Branchen-Mindset, Resilienz`;
+WICHTIG: Abwechslung zwischen Makler-fokussierten und Baufinanzierer-fokussierten Posts. Nutze Markt-News als Aufhänger für REOS-relevante Inhalte. Vermeide generisches Marketing-Sprech.`;
 
   const userPrompt = `Erstelle einen Wochenplan (KW ${weekNumber}) mit genau 6 Posts für Montag bis Samstag.
 
@@ -151,8 +182,11 @@ DESIGN SYSTEM (niksetting / Grow Acquisition):
 - Layout: ${DESIGN_SYSTEM.layout}
 `.trim();
 
-  const prompt = `Du erstellst einen detaillierten Canva-Design-Brief für diesen Post:
+  const prompt = `Du erstellst einen detaillierten Canva-Design-Brief für REOS Group.
 
+${REOS_CONTEXT}
+
+POST-DETAILS:
 TITEL: ${contentIdea.title}
 PILLAR: ${contentIdea.pillar}
 FORMAT: ${contentIdea.format}
@@ -161,6 +195,8 @@ BASIS: ${contentIdea.news_basis || 'N/A'}
 ANZAHL SLIDES: ${contentIdea.slide_count || 5}
 
 ${designSystemText}
+
+FOTO-STIL FÜR PHOTO_PROMPT: Immer dunkle, cineastische Luxury-Ästhetik. Beispiele: Stadtskyline bei Nacht, dunkle elegante Bibliothek mit Leder und Holz, Porsche GT3RS von hinten bei Nacht, modernes Penthouse mit Stadtblick, Männerhände an einem Steuerrad eines Luxusautos, dunkler Konferenzraum mit Glasfront über der Stadt. Immer dunkel, edel, dramatisch beleuchtet — wie tuxedosociety oder niksetting.
 
 Erstelle einen Slide-für-Slide Design-Brief als JSON-Array. Jedes Slide-Objekt:
 {
@@ -226,15 +262,18 @@ Antworte NUR mit dem JSON-Array, kein Text drumherum.`;
 async function generateCaption(contentIdea, platform = 'instagram') {
   const isLinkedIn = platform.toLowerCase() === 'linkedin';
 
-  const prompt = `Du schreibst eine ${isLinkedIn ? 'LinkedIn' : 'Instagram'}-Caption für diesen Immobilienmakler-Post:
+  const prompt = `Du schreibst eine ${isLinkedIn ? 'LinkedIn' : 'Instagram'}-Caption für REOS Group.
 
+${REOS_CONTEXT}
+
+POST-DETAILS:
 TITEL: ${contentIdea.title}
 PILLAR: ${contentIdea.pillar}
 FORMAT: ${contentIdea.format}
 HOOK: ${contentIdea.hook}
 BASIS: ${contentIdea.news_basis || 'N/A'}
 
-Ton: direkt, professionell, auf Augenhöhe mit erfahrenen deutschen Maklern. Keine Floskeln.
+Ton: Direkt, premium, auf Augenhöhe mit erfolgreichen Unternehmern. Kein Guru-Stil. Exklusivitäts-Gefühl transportieren. Wo passend: CTA zur Bewerbung für die Membership.
 
 ${isLinkedIn ? `LinkedIn-Format:
 - Hook-Satz (max. 2 Zeilen, zieht zum "mehr lesen")

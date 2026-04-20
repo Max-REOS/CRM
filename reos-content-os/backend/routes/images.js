@@ -4,7 +4,7 @@ const express = require('express');
 const router = express.Router();
 const { db } = require('../db/database');
 
-const LUXURY_STYLE_SUFFIX = ', dark luxury aesthetic, cinematic photography, dramatic lighting, deep shadows, golden accents, moody atmosphere, ultra-realistic, professional architectural photography, 8k, editorial style, dark background';
+const LUXURY_STYLE_SUFFIX = ', ultra dark luxury aesthetic, cinematic photography, dramatic chiaroscuro lighting, deep shadows, rich blacks, subtle golden accents, moody night atmosphere, ultra-realistic, 8k, editorial style, tuxedo society aesthetic, dark background, no people, architectural or automotive subject';
 
 async function generateImage(prompt, slideNumber = 1) {
   const key = process.env.FAL_API_KEY;
