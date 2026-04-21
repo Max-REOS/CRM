@@ -100,17 +100,23 @@ async function generateImageFal(prompt) {
   return falUrl;
 }
 
-// ── Unified entry point: prefer Higgsfield, fall back to fal.ai ──────────────
+// ── Unified entry point: prefer Higgsfield, auto-fallback to fal.ai ─────────
 async function generateImage(prompt) {
-  const useHiggsfield = !!process.env.HIGGSFIELD_API_KEY;
-  const provider = useHiggsfield ? 'Higgsfield' : 'fal.ai';
-  console.log(`Image provider: ${provider}`);
-
   let remoteUrl;
-  if (useHiggsfield) {
-    remoteUrl = await generateImageHiggsfield(prompt);
+
+  if (process.env.HIGGSFIELD_API_KEY) {
+    try {
+      console.log('Image provider: Higgsfield');
+      remoteUrl = await generateImageHiggsfield(prompt);
+    } catch (err) {
+      console.warn(`Higgsfield failed (${err.message}), falling back to fal.ai…`);
+      if (!process.env.FAL_API_KEY) throw new Error('Higgsfield fehlgeschlagen und kein FAL_API_KEY als Fallback');
+      console.log('Image provider: fal.ai (fallback)');
+      remoteUrl = await generateImageFal(prompt);
+    }
   } else {
     if (!process.env.FAL_API_KEY) throw new Error('Weder HIGGSFIELD_API_KEY noch FAL_API_KEY konfiguriert');
+    console.log('Image provider: fal.ai');
     remoteUrl = await generateImageFal(prompt);
   }
 
