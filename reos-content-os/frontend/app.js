@@ -1008,13 +1008,23 @@ async function renderSlideCanvas(slide, imageUrl, totalSlides) {
   ctx.fillStyle = '#0A0A0A';
   ctx.fillRect(0, 0, S, S);
 
-  // Background image
+  // Background image — cover mode using naturalWidth/naturalHeight
   if (imageUrl) {
     try {
       const img = await loadCanvasImage(imageUrl);
-      const scale = Math.max(S / img.width, S / img.height);
-      const w = img.width * scale, h = img.height * scale;
-      ctx.drawImage(img, (S - w) / 2, (S - h) / 2, w, h);
+      const sw = img.naturalWidth || img.width;
+      const sh = img.naturalHeight || img.height;
+      const scale = Math.max(S / sw, S / sh);
+      const dw = Math.ceil(sw * scale);
+      const dh = Math.ceil(sh * scale);
+      const dx = Math.floor((S - dw) / 2);
+      const dy = Math.floor((S - dh) / 2);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, S, S);
+      ctx.clip();
+      ctx.drawImage(img, 0, 0, sw, sh, dx, dy, dw, dh);
+      ctx.restore();
     } catch (e) {
       console.error('Canvas image load failed:', imageUrl, e.message);
     }
