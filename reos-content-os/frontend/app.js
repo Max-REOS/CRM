@@ -1094,8 +1094,10 @@ async function renderSlideCanvas(slide, imageUrl, totalSlides) {
 }
 
 async function loadCanvasImage(url) {
-  const proxyUrl = `/api/images/proxy?url=${encodeURIComponent(url)}`;
-  const response = await fetch(proxyUrl);
+  // Local URLs (starting with /) are same-origin — load directly, no CORS issue
+  // External URLs go through proxy
+  const fetchUrl = url.startsWith('/') ? url : `/api/images/proxy?url=${encodeURIComponent(url)}`;
+  const response = await fetch(fetchUrl);
   if (!response.ok) throw new Error(`Image fetch failed: ${response.status}`);
   const blob = await response.blob();
   const objectUrl = URL.createObjectURL(blob);
