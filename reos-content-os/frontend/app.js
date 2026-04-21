@@ -958,13 +958,20 @@ async function exportSlides() {
     const zip = new JSZip();
     const total = slides.length;
 
+    let imagesLoaded = 0;
     for (let i = 0; i < total; i++) {
       const slide = slides[i];
+      const url = imageMap[slide.slide_number];
       document.getElementById('loading-message').textContent = `Slide ${i + 1} von ${total} wird gerendert…`;
-      const canvas = await renderSlideCanvas(slide, imageMap[slide.slide_number], total);
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.93));
+      if (url) imagesLoaded++;
+      const canvas = await renderSlideCanvas(slide, url, total);
+      const blob = await new Promise((resolve, reject) => {
+        try { canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob null')), 'image/jpeg', 0.93); }
+        catch (e) { reject(e); }
+      });
       zip.file(`reos_slide_${String(slide.slide_number).padStart(2, '0')}.jpg`, blob);
     }
+    if (imagesLoaded === 0) showToast('Hinweis: Keine Bilder gefunden — bitte erst "Bilder generieren" klicken', 'error');
 
     if (state.activeCaptionData) {
       const cap = state.activeCaptionData;
@@ -1008,7 +1015,9 @@ async function renderSlideCanvas(slide, imageUrl, totalSlides) {
       const scale = Math.max(S / img.width, S / img.height);
       const w = img.width * scale, h = img.height * scale;
       ctx.drawImage(img, (S - w) / 2, (S - h) / 2, w, h);
-    } catch {}
+    } catch (e) {
+      console.error('Canvas image load failed:', imageUrl, e.message);
+    }
   }
 
   // Gradient overlay — dark at bottom for text
@@ -1094,17 +1103,16 @@ async function renderSlideCanvas(slide, imageUrl, totalSlides) {
 }
 
 async function loadCanvasImage(url) {
-  // Local URLs (starting with /) are same-origin — load directly, no CORS issue
-  // External URLs go through proxy
+  // Fetch as blob — works for both local (/api/...) and external URLs via proxy
   const fetchUrl = url.startsWith('/') ? url : `/api/images/proxy?url=${encodeURIComponent(url)}`;
   const response = await fetch(fetchUrl);
-  if (!response.ok) throw new Error(`Image fetch failed: ${response.status}`);
+  if (!response.ok) throw new Error(`HTTP ${response.status} for ${fetchUrl}`);
   const blob = await response.blob();
   const objectUrl = URL.createObjectURL(blob);
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => { URL.revokeObjectURL(objectUrl); resolve(img); };
-    img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('decode failed')); };
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('Image decode failed')); };
     img.src = objectUrl;
   });
 }
