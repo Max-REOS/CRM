@@ -1028,11 +1028,11 @@ async function renderSlideCanvas(slide, imageUrl, totalSlides) {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, S, S);
 
-  // Gold accent bar top-left
+  // Gold accent bar top-left (above hero text)
   ctx.fillStyle = '#C9A84C';
-  ctx.fillRect(60, 64, 140, 3);
+  ctx.fillRect(60, 44, 100, 3);
 
-  let y = 120;
+  let y = 160;
 
   // Hero element
   if (slide.hero_element) {
