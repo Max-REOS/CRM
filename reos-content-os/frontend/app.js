@@ -1032,14 +1032,7 @@ async function renderSlideCanvas(slide, imageUrl, totalSlides) {
   ctx.fillStyle = '#C9A84C';
   ctx.fillRect(60, 64, 140, 3);
 
-  // Slide type label
-  const typeLabel = { cover: 'COVER', content: 'CONTENT', cta: 'CTA' }[slide.type] || 'SLIDE';
-  ctx.font = '500 22px system-ui, sans-serif';
-  ctx.fillStyle = 'rgba(201,168,76,0.75)';
-  ctx.textAlign = 'left';
-  ctx.fillText(`${typeLabel}  ·  ${slide.slide_number}/${totalSlides}`, 60, 106);
-
-  let y = 190;
+  let y = 120;
 
   // Hero element
   if (slide.hero_element) {
