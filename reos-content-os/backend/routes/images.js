@@ -9,17 +9,77 @@ const { db } = require('../db/database');
 const IMAGES_DIR = path.join(__dirname, '..', '..', 'data', 'images');
 if (!fs.existsSync(IMAGES_DIR)) fs.mkdirSync(IMAGES_DIR, { recursive: true });
 
-const LUXURY_STYLE_SUFFIX = ', ultra dark luxury aesthetic, cinematic photography, dramatic chiaroscuro lighting, deep shadows, rich blacks, subtle golden accents, moody night atmosphere, ultra-realistic, 8k, editorial style, tuxedo society aesthetic, dark background, no people, architectural or automotive subject';
+// Style suffixes tuned per provider
+const HIGGSFIELD_STYLE = ', ultra-luxury cinematic photography, dramatic chiaroscuro lighting, deep shadows, rich blacks, golden accent tones, hyper-realistic editorial style, 8K, private members club atmosphere, sophisticated and exclusive, photojournalistic authenticity, no text, no watermarks';
+const FAL_STYLE = ', ultra dark luxury aesthetic, cinematic photography, dramatic chiaroscuro lighting, deep shadows, rich blacks, subtle golden accents, moody night atmosphere, ultra-realistic, 8k, editorial style, tuxedo society aesthetic, dark background, no people, architectural or automotive subject';
 
-async function generateImage(prompt) {
+// ── Higgsfield Seedream v4 (async: submit → poll) ────────────────────────────
+async function generateImageHiggsfield(prompt) {
+  const key = process.env.HIGGSFIELD_API_KEY; // format: KEY_ID:KEY_SECRET
+
+  const submitRes = await fetch('https://platform.higgsfield.ai/bytedance/seedream/v4/text-to-image', {
+    method: 'POST',
+    headers: { 'Authorization': `Key ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      prompt: prompt + HIGGSFIELD_STYLE,
+      resolution: '2K',
+      aspect_ratio: '1:1',
+      camera_fixed: false
+    })
+  });
+
+  if (!submitRes.ok) {
+    const errText = await submitRes.text();
+    throw new Error(`Higgsfield submit error ${submitRes.status}: ${errText}`);
+  }
+
+  const submitted = await submitRes.json();
+  const requestId = submitted.request_id;
+  if (!requestId) throw new Error(`Higgsfield: no request_id in response: ${JSON.stringify(submitted)}`);
+
+  console.log(`Higgsfield job submitted: ${requestId}`);
+
+  // Poll up to 5 minutes (60 × 5s)
+  for (let attempt = 0; attempt < 60; attempt++) {
+    await new Promise(r => setTimeout(r, 5000));
+
+    const pollRes = await fetch(`https://platform.higgsfield.ai/requests/${requestId}`, {
+      headers: { 'Authorization': `Key ${key}` }
+    });
+
+    if (!pollRes.ok) {
+      console.warn(`Higgsfield poll attempt ${attempt + 1} returned ${pollRes.status}`);
+      continue;
+    }
+
+    const pollJson = await pollRes.json();
+    const status = pollJson.status;
+
+    if (status === 'COMPLETED') {
+      const remoteUrl = pollJson.images?.[0]?.url;
+      if (!remoteUrl) throw new Error('Higgsfield COMPLETED but no image URL');
+      return remoteUrl;
+    }
+
+    if (status === 'FAILED') {
+      throw new Error(`Higgsfield generation failed: ${pollJson.error || 'unknown reason'}`);
+    }
+
+    console.log(`Higgsfield status: ${status} (attempt ${attempt + 1})`);
+  }
+
+  throw new Error('Higgsfield timeout after 5 minutes');
+}
+
+// ── fal.ai Flux Pro 1.1 (sync) ───────────────────────────────────────────────
+async function generateImageFal(prompt) {
   const key = process.env.FAL_API_KEY;
-  if (!key) throw new Error('FAL_API_KEY ist nicht konfiguriert');
 
   const response = await fetch('https://fal.run/fal-ai/flux-pro/v1.1', {
     method: 'POST',
     headers: { 'Authorization': `Key ${key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      prompt: prompt + LUXURY_STYLE_SUFFIX,
+      prompt: prompt + FAL_STYLE,
       image_size: 'square_hd',
       num_inference_steps: 28,
       guidance_scale: 3.5,
@@ -37,20 +97,40 @@ async function generateImage(prompt) {
   const json = await response.json();
   const falUrl = json.images?.[0]?.url;
   if (!falUrl) throw new Error('fal.ai returned no image URL');
+  return falUrl;
+}
+
+// ── Unified entry point: prefer Higgsfield, fall back to fal.ai ──────────────
+async function generateImage(prompt) {
+  const useHiggsfield = !!process.env.HIGGSFIELD_API_KEY;
+  const provider = useHiggsfield ? 'Higgsfield' : 'fal.ai';
+  console.log(`Image provider: ${provider}`);
+
+  let remoteUrl;
+  if (useHiggsfield) {
+    remoteUrl = await generateImageHiggsfield(prompt);
+  } else {
+    if (!process.env.FAL_API_KEY) throw new Error('Weder HIGGSFIELD_API_KEY noch FAL_API_KEY konfiguriert');
+    remoteUrl = await generateImageFal(prompt);
+  }
 
   // Download and save locally so URLs never expire
   const filename = `img_${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
   const localPath = path.join(IMAGES_DIR, filename);
-  const imgRes = await fetch(falUrl);
-  if (imgRes.ok) {
+  try {
+    const imgRes = await fetch(remoteUrl);
+    if (!imgRes.ok) throw new Error(`Download failed: ${imgRes.status}`);
     const buf = await imgRes.arrayBuffer();
     fs.writeFileSync(localPath, Buffer.from(buf));
+    console.log(`Image saved locally: ${filename}`);
     return `/api/images/file/${filename}`;
+  } catch (err) {
+    console.warn('Local save failed, returning remote URL:', err.message);
+    return remoteUrl;
   }
-
-  // Fallback: return original URL if download fails
-  return falUrl;
 }
+
+// ── Routes ───────────────────────────────────────────────────────────────────
 
 // GET /api/images/file/:filename — serve locally saved images
 router.get('/file/:filename', (req, res) => {
@@ -82,8 +162,8 @@ router.get('/proxy', async (req, res) => {
 // POST /api/images/generate
 router.post('/generate', async (req, res) => {
   try {
-    if (!process.env.FAL_API_KEY) {
-      return res.status(400).json({ success: false, error: 'FAL_API_KEY ist nicht konfiguriert.' });
+    if (!process.env.HIGGSFIELD_API_KEY && !process.env.FAL_API_KEY) {
+      return res.status(400).json({ success: false, error: 'Kein Image-API-Key konfiguriert (HIGGSFIELD_API_KEY oder FAL_API_KEY).' });
     }
     const { prompt, ideaId, slideNumber = 1 } = req.body;
     if (!prompt) return res.status(400).json({ success: false, error: 'prompt ist erforderlich' });
@@ -108,8 +188,8 @@ router.post('/generate', async (req, res) => {
 // POST /api/images/generate-all/:ideaId
 router.post('/generate-all/:ideaId', async (req, res) => {
   try {
-    if (!process.env.FAL_API_KEY) {
-      return res.status(400).json({ success: false, error: 'FAL_API_KEY ist nicht konfiguriert.' });
+    if (!process.env.HIGGSFIELD_API_KEY && !process.env.FAL_API_KEY) {
+      return res.status(400).json({ success: false, error: 'Kein Image-API-Key konfiguriert.' });
     }
 
     const ideaId = Number(req.params.ideaId);
