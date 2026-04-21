@@ -43,7 +43,7 @@ async function generateImageHiggsfield(prompt) {
   for (let attempt = 0; attempt < 60; attempt++) {
     await new Promise(r => setTimeout(r, 5000));
 
-    const pollRes = await fetch(`https://platform.higgsfield.ai/requests/${requestId}`, {
+    const pollRes = await fetch(`https://platform.higgsfield.ai/requests/${requestId}/status`, {
       headers: { 'Authorization': `Key ${key}` }
     });
 
@@ -53,16 +53,16 @@ async function generateImageHiggsfield(prompt) {
     }
 
     const pollJson = await pollRes.json();
-    const status = pollJson.status;
+    const status = (pollJson.status || '').toLowerCase();
 
-    if (status === 'COMPLETED') {
-      const remoteUrl = pollJson.images?.[0]?.url;
-      if (!remoteUrl) throw new Error('Higgsfield COMPLETED but no image URL');
+    if (status === 'completed') {
+      const remoteUrl = pollJson.images?.[0]?.url || pollJson.results?.[0]?.url;
+      if (!remoteUrl) throw new Error(`Higgsfield completed but no image URL: ${JSON.stringify(pollJson)}`);
       return remoteUrl;
     }
 
-    if (status === 'FAILED') {
-      throw new Error(`Higgsfield generation failed: ${pollJson.error || 'unknown reason'}`);
+    if (status === 'failed' || status === 'nsfw' || status === 'canceled') {
+      throw new Error(`Higgsfield generation ${status}: ${pollJson.error || 'unknown reason'}`);
     }
 
     console.log(`Higgsfield status: ${status} (attempt ${attempt + 1})`);
