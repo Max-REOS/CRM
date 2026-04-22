@@ -1122,7 +1122,7 @@ async function renderSlideCanvas(slide, imageUrl, totalSlides) {
     ctx.textAlign = 'center';
     ctx.font = 'bold 72px system-ui, sans-serif';
     ctx.fillStyle = '#FFFFFF';
-    y = wrapCanvasText(ctx, slide.headline, S / 2, y, S - 240, 84, 3) + 28;
+    y = wrapCanvasText(ctx, slide.headline, S / 2, y, S - 240, 84, 5) + 28;
   }
 
   // Body text — left-aligned with generous margins
@@ -1130,7 +1130,7 @@ async function renderSlideCanvas(slide, imageUrl, totalSlides) {
     ctx.textAlign = 'left';
     ctx.font = '400 34px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,0.88)';
-    y = wrapCanvasText(ctx, slide.body_text, 120, y, S - 240, 48, 3) + 24;
+    y = wrapCanvasText(ctx, slide.body_text, 120, y, S - 240, 48, 5) + 24;
   }
 
   // Reset shadow before drawing boxes
