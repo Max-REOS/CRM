@@ -1008,13 +1008,13 @@ async function renderSlideCanvas(slide, imageUrl, totalSlides) {
   ctx.fillStyle = '#0A0A0A';
   ctx.fillRect(0, 0, S, S);
 
-  // Background image — cover mode using naturalWidth/naturalHeight
+  // Background image — 8% overscan eliminates any gray edge artifacts from AI generators
   if (imageUrl) {
     try {
       const img = await loadCanvasImage(imageUrl);
       const sw = img.naturalWidth || img.width;
       const sh = img.naturalHeight || img.height;
-      const scale = Math.max(S / sw, S / sh);
+      const scale = Math.max(S / sw, S / sh) * 1.08;
       const dw = Math.ceil(sw * scale);
       const dh = Math.ceil(sh * scale);
       const dx = Math.floor((S - dw) / 2);
@@ -1029,6 +1029,20 @@ async function renderSlideCanvas(slide, imageUrl, totalSlides) {
       console.error('Canvas image load failed:', imageUrl, e.message);
     }
   }
+
+  // Dark edge vignette — covers any residual artifacts at all 4 borders
+  const edgeSize = 60;
+  ['left', 'right', 'top', 'bottom'].forEach(side => {
+    const vg = side === 'left'   ? ctx.createLinearGradient(0, 0, edgeSize, 0)
+             : side === 'right'  ? ctx.createLinearGradient(S, 0, S - edgeSize, 0)
+             : side === 'top'    ? ctx.createLinearGradient(0, 0, 0, edgeSize)
+             :                     ctx.createLinearGradient(0, S, 0, S - edgeSize);
+    vg.addColorStop(0, 'rgba(10,10,10,0.9)');
+    vg.addColorStop(1, 'rgba(10,10,10,0)');
+    ctx.fillStyle = vg;
+    if (side === 'left'  || side === 'right')  ctx.fillRect(side === 'left' ? 0 : S - edgeSize, 0, edgeSize, S);
+    else ctx.fillRect(0, side === 'top' ? 0 : S - edgeSize, S, edgeSize);
+  });
 
   // Gradient overlay — dark at bottom for text
   const grad = ctx.createLinearGradient(0, 0, 0, S);
