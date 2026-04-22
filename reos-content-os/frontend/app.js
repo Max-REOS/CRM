@@ -601,10 +601,28 @@ function renderSlideCard(slide, imageUrl) {
             </div>
           </div>
         </div>
-        ${fields.map(([label, value]) => `
-          <div class="brief-field">
-            <span class="brief-field-label">${label}</span>
-            <span class="brief-field-value">${value}</span>
+        ${[
+          ['hero_element', 'Hero-Element', slide.hero_element],
+          ['headline', 'Headline', slide.headline],
+          ['body_text', 'Body-Text', slide.body_text],
+          ['info_box', 'Info-Box', slide.info_box],
+        ].filter(([,, v]) => v).map(([field, label, value]) => `
+          <div class="brief-field brief-field-prompt">
+            <div class="brief-field-prompt-header">
+              <span class="brief-field-label">${label}</span>
+              <button class="btn-edit-prompt" onclick="toggleEditText(${sn}, '${field}')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                Bearbeiten
+              </button>
+            </div>
+            <span class="brief-field-value" id="text-display-${sn}-${field}">${escHtml(value).replace(/\n/g, '<br>')}</span>
+            <div class="prompt-edit-box" id="text-edit-${sn}-${field}" style="display:none">
+              <textarea class="textarea prompt-textarea" id="text-input-${sn}-${field}" rows="${field === 'body_text' ? 4 : 2}">${escHtml(value)}</textarea>
+              <div class="prompt-edit-actions">
+                <button class="btn btn-secondary btn-xs" onclick="toggleEditText(${sn}, '${field}')">Abbrechen</button>
+                <button class="btn btn-primary btn-xs" onclick="saveText(${sn}, '${field}')">Speichern</button>
+              </div>
+            </div>
           </div>`).join('')}
         ${slide.design_notes ? `<div class="brief-design-notes">${escHtml(slide.design_notes).replace(/\n/g, '<br>')}</div>` : ''}
       </div>
@@ -632,6 +650,33 @@ async function savePrompt(slideNumber) {
     document.getElementById(`prompt-display-${slideNumber}`).textContent = newPrompt;
     toggleEditPrompt(slideNumber);
     showToast('Prompt gespeichert', 'success');
+  } catch (err) {
+    showToast('Fehler beim Speichern: ' + err.message, 'error');
+  }
+}
+
+function toggleEditText(slideNumber, field) {
+  const display = document.getElementById(`text-display-${slideNumber}-${field}`);
+  const editBox = document.getElementById(`text-edit-${slideNumber}-${field}`);
+  const isEditing = editBox.style.display !== 'none';
+  display.style.display = isEditing ? '' : 'none';
+  editBox.style.display = isEditing ? 'none' : 'block';
+  if (!isEditing) document.getElementById(`text-input-${slideNumber}-${field}`).focus();
+}
+
+async function saveText(slideNumber, field) {
+  if (!state.activeBriefData || !state.activeBriefIdeaId) return;
+  const newValue = document.getElementById(`text-input-${slideNumber}-${field}`).value.trim();
+  const slides = state.activeBriefData.slides.map(s =>
+    s.slide_number === slideNumber ? { ...s, [field]: newValue } : s
+  );
+  try {
+    await apiCall(`/content/design-brief/${state.activeBriefIdeaId}`, { method: 'PUT', body: { slides } });
+    state.activeBriefData = { ...state.activeBriefData, slides };
+    const display = document.getElementById(`text-display-${slideNumber}-${field}`);
+    display.innerHTML = escHtml(newValue).replace(/\n/g, '<br>');
+    toggleEditText(slideNumber, field);
+    showToast('Text gespeichert', 'success');
   } catch (err) {
     showToast('Fehler beim Speichern: ' + err.message, 'error');
   }
