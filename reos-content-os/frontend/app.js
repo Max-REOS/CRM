@@ -1050,25 +1050,28 @@ async function renderSlideCanvas(slide, imageUrl, totalSlides) {
 
   let y = 160;
 
-  // Hero element
+  // Hero element — centered so it's always fully visible in grid view
   if (slide.hero_element) {
+    ctx.textAlign = 'center';
     ctx.font = 'bold 108px system-ui, sans-serif';
     ctx.fillStyle = '#C9A84C';
-    y = wrapCanvasText(ctx, slide.hero_element, 60, y, S - 120, 118) + 10;
+    y = wrapCanvasText(ctx, slide.hero_element, S / 2, y, S - 240, 118) + 10;
   }
 
-  // Headline — larger for grid readability
+  // Headline — centered for grid readability
   if (slide.headline) {
+    ctx.textAlign = 'center';
     ctx.font = 'bold 72px system-ui, sans-serif';
     ctx.fillStyle = '#FFFFFF';
-    y = wrapCanvasText(ctx, slide.headline, 60, y, S - 120, 84, 3) + 28;
+    y = wrapCanvasText(ctx, slide.headline, S / 2, y, S - 240, 84, 3) + 28;
   }
 
-  // Body text — slightly larger, max 3 lines
+  // Body text — left-aligned with generous margins
   if (slide.body_text) {
+    ctx.textAlign = 'left';
     ctx.font = '400 34px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,0.88)';
-    y = wrapCanvasText(ctx, slide.body_text, 60, y, S - 120, 48, 3) + 24;
+    y = wrapCanvasText(ctx, slide.body_text, 120, y, S - 240, 48, 3) + 24;
   }
 
   // Reset shadow before drawing boxes
@@ -1082,14 +1085,15 @@ async function renderSlideCanvas(slide, imageUrl, totalSlides) {
     ctx.strokeStyle = 'rgba(201,168,76,0.6)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.rect(60, y, S - 120, boxH);
+    ctx.rect(120, y, S - 240, boxH);
     ctx.fill(); ctx.stroke();
     ctx.shadowColor = 'rgba(0,0,0,0.7)';
     ctx.shadowBlur = 8;
+    ctx.textAlign = 'left';
     ctx.font = '600 28px system-ui, sans-serif';
     ctx.fillStyle = '#C9A84C';
     const infoTxt = slide.info_box.length > 60 ? slide.info_box.slice(0, 57) + '…' : slide.info_box;
-    ctx.fillText(infoTxt, 80, y + 44);
+    ctx.fillText(infoTxt, 140, y + 44);
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
   }
@@ -1102,7 +1106,7 @@ async function renderSlideCanvas(slide, imageUrl, totalSlides) {
   ctx.font = 'bold 32px system-ui, sans-serif';
   ctx.fillStyle = '#C9A84C';
   ctx.textAlign = 'left';
-  ctx.fillText('REOS', 60, S - 32);
+  ctx.fillText('REOS', 120, S - 32);
 
   // Progress dots
   const dotR = 5, dotGap = 18;
