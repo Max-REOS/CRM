@@ -202,7 +202,7 @@ Erstelle einen Slide-für-Slide Design-Brief als JSON-Array. Jedes Slide-Objekt:
 {
   "slide_number": 1,
   "type": "cover",
-  "photo_prompt": "Beschreibung des Hintergrundfotos für Unsplash/KI-Bildgenerierung",
+  "photo_prompt": "English description of the background photo scene — purely visual, NO text/signs/words/letters in the image, cinematic luxury atmosphere",
   "hero_element": "Die große Zahl oder das Kernelement (z.B. '+12%' oder 'EPX')",
   "headline": "Hauptüberschrift des Slides",
   "body_text": "Fließtext / Bullet Points für dieses Slide",
@@ -450,7 +450,7 @@ Erstelle ein JSON-Array mit exakt ${slideCountNum} Slides (Cover → Content-Sli
   {
     "slide_number": 1,
     "type": "cover",
-    "photo_prompt": "English prompt for fal.ai Flux Pro image generation",
+    "photo_prompt": "English scene description, purely visual, NO text or signs in image",
     "hero_element": "Big number or key element",
     "headline": "Main headline",
     "body_text": "Body text / bullet points",

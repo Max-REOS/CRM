@@ -10,7 +10,7 @@ const IMAGES_DIR = path.join(__dirname, '..', '..', 'data', 'images');
 if (!fs.existsSync(IMAGES_DIR)) fs.mkdirSync(IMAGES_DIR, { recursive: true });
 
 // Style suffixes tuned per provider
-const HIGGSFIELD_STYLE = ', ultra-luxury cinematic photography, dramatic chiaroscuro lighting, deep shadows, rich blacks, golden accent tones, hyper-realistic editorial style, 8K, private members club atmosphere, sophisticated and exclusive, photojournalistic authenticity, no text, no watermarks';
+const HIGGSFIELD_STYLE = ', ultra-luxury cinematic photography, dramatic chiaroscuro lighting, deep shadows, rich blacks, golden accent tones, hyper-realistic editorial style, 8K, sophisticated and exclusive atmosphere, photojournalistic authenticity, absolutely no text, no letters, no words, no signs, no labels, no writing, no watermarks, no logos, pure visual scene only';
 const FAL_STYLE = ', ultra dark luxury aesthetic, cinematic photography, dramatic chiaroscuro lighting, deep shadows, rich blacks, subtle golden accents, moody night atmosphere, ultra-realistic, 8k, editorial style, tuxedo society aesthetic, dark background, no people, architectural or automotive subject';
 
 // ── Higgsfield Seedream v4 (async: submit → poll) ────────────────────────────
