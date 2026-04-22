@@ -1042,6 +1042,12 @@ async function renderSlideCanvas(slide, imageUrl, totalSlides) {
   ctx.fillStyle = '#C9A84C';
   ctx.fillRect(60, 44, 100, 3);
 
+  // Text shadow for all text elements — improves readability on any background
+  ctx.shadowColor = 'rgba(0,0,0,0.85)';
+  ctx.shadowBlur = 12;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 3;
+
   let y = 160;
 
   // Hero element
@@ -1051,33 +1057,41 @@ async function renderSlideCanvas(slide, imageUrl, totalSlides) {
     y = wrapCanvasText(ctx, slide.hero_element, 60, y, S - 120, 118) + 10;
   }
 
-  // Headline
+  // Headline — larger for grid readability
   if (slide.headline) {
-    ctx.font = 'bold 54px system-ui, sans-serif';
+    ctx.font = 'bold 72px system-ui, sans-serif';
     ctx.fillStyle = '#FFFFFF';
-    y = wrapCanvasText(ctx, slide.headline, 60, y, S - 120, 66, 3) + 24;
+    y = wrapCanvasText(ctx, slide.headline, 60, y, S - 120, 84, 3) + 28;
   }
 
-  // Body text
+  // Body text — slightly larger, max 3 lines
   if (slide.body_text) {
-    ctx.font = '400 30px system-ui, sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,0.82)';
-    y = wrapCanvasText(ctx, slide.body_text, 60, y, S - 120, 42, 5) + 20;
+    ctx.font = '400 34px system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.88)';
+    y = wrapCanvasText(ctx, slide.body_text, 60, y, S - 120, 48, 3) + 24;
   }
+
+  // Reset shadow before drawing boxes
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
 
   // Info box
   if (slide.info_box && y < S - 200) {
-    const boxH = 64;
-    ctx.fillStyle = 'rgba(201,168,76,0.12)';
-    ctx.strokeStyle = 'rgba(201,168,76,0.5)';
-    ctx.lineWidth = 1;
+    const boxH = 68;
+    ctx.fillStyle = 'rgba(201,168,76,0.15)';
+    ctx.strokeStyle = 'rgba(201,168,76,0.6)';
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.rect(60, y, S - 120, boxH);
     ctx.fill(); ctx.stroke();
-    ctx.font = '500 26px system-ui, sans-serif';
+    ctx.shadowColor = 'rgba(0,0,0,0.7)';
+    ctx.shadowBlur = 8;
+    ctx.font = '600 28px system-ui, sans-serif';
     ctx.fillStyle = '#C9A84C';
-    const infoTxt = slide.info_box.length > 65 ? slide.info_box.slice(0, 62) + '…' : slide.info_box;
-    ctx.fillText(infoTxt, 80, y + 40);
+    const infoTxt = slide.info_box.length > 60 ? slide.info_box.slice(0, 57) + '…' : slide.info_box;
+    ctx.fillText(infoTxt, 80, y + 44);
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
   }
 
   // Bottom bar
