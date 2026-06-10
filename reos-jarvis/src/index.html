@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://api.anthropic.com https://www.googleapis.com https://oauth2.googleapis.com https://calendar.googleapis.com;">
+  <title>REOS JARVIS</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- Splash -->
+<div id="splash">
+  <div class="splash-logo">J</div>
+  <div class="splash-title">JARVIS</div>
+  <div class="splash-sub">REOS PLATFORM GMBH · PERSONAL INTELLIGENCE SYSTEM</div>
+  <div class="splash-bar"><div class="splash-progress" id="splash-progress"></div></div>
+</div>
+
+<!-- Titlebar -->
+<div id="titlebar">
+  <div class="brand">
+    <div class="arc-logo">⬡</div>
+    <div>
+      <div class="title-text">JARVIS</div>
+      <div class="title-sub">REOS INTELLIGENCE v1.0</div>
+    </div>
+  </div>
+  <div class="spacer"></div>
+  <div class="view-tabs">
+    <button class="view-tab active" data-view="globe" id="tab-globe">● GLOBUS</button>
+    <button class="view-tab" data-view="list" id="tab-list">● ÜBERSICHT</button>
+    <button class="view-tab" data-view="chat" id="tab-chat">● CHAT</button>
+    <button class="view-tab" data-view="tasks" id="tab-tasks">● AUFGABEN</button>
+    <button class="view-tab" data-view="calendar" id="tab-cal">● KALENDER</button>
+    <button class="view-tab" data-view="settings" id="tab-settings">● EINSTELLUNGEN</button>
+  </div>
+  <div class="win-controls">
+    <button class="win-btn min" id="btn-min"></button>
+    <button class="win-btn max" id="btn-max"></button>
+    <button class="win-btn close" id="btn-close"></button>
+  </div>
+</div>
+
+<!-- App -->
+<div id="app">
+
+  <!-- Globe View -->
+  <div class="view globe-view active" id="view-globe">
+    <canvas id="globe-canvas"></canvas>
+    <div class="globe-tooltip" id="globe-tooltip" style="display:none"></div>
+    <div class="globe-detail-panel" id="globe-detail">
+      <button class="detail-close" id="detail-close">✕</button>
+      <div class="detail-category-label" id="detail-cat"></div>
+      <div id="detail-hub-badge" class="hub-badge" style="display:none">⬡ HUB-CHAT</div>
+      <div class="detail-title" id="detail-title"></div>
+      <div class="detail-date" id="detail-date"></div>
+      <div class="detail-section-label">ZUSAMMENFASSUNG</div>
+      <div class="detail-content" id="detail-summary"></div>
+      <div class="detail-section-label">SCHLÜSSEL-THEMEN</div>
+      <div class="detail-tags" id="detail-tags"></div>
+      <div class="detail-section-label">ENTSCHEIDUNGEN</div>
+      <div class="detail-content" id="detail-decisions"></div>
+      <button class="btn-open-chat" id="detail-open-chat">→ CHAT ÖFFNEN & FORTSETZEN</button>
+    </div>
+  </div>
+
+  <!-- List View -->
+  <div class="view list-view" id="view-list">
+    <div class="list-sidebar">
+      <input type="text" class="list-search" id="list-search" placeholder="Suchen...">
+      <div class="cat-filters" id="cat-filters"></div>
+      <div class="chat-list" id="chat-list"></div>
+    </div>
+    <div class="list-detail" id="list-detail">
+      <div class="list-detail-empty">← CHAT AUSWÄHLEN</div>
+    </div>
+  </div>
+
+  <!-- Chat View -->
+  <div class="view" id="view-chat" style="display:none">
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <button class="btn-new" id="btn-new-chat">+ NEUES GESPRÄCH</button>
+      </div>
+      <div class="session-list" id="session-list"></div>
+      <div class="sidebar-footer">
+        <button class="btn-kb" id="btn-kb">📚 WISSENSDATENBANK</button>
+      </div>
+    </div>
+    <div class="chat-main">
+      <div class="chat-messages" id="chat-messages"></div>
+      <div class="chat-footer">
+        <div class="input-row">
+          <button class="icon-btn" id="btn-voice" title="Spracheingabe">🎤</button>
+          <textarea class="chat-input" id="chat-input" placeholder="Nachricht an JARVIS..." rows="1"></textarea>
+          <button class="icon-btn" id="btn-send" title="Senden">▶</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tasks View -->
+  <div class="view" id="view-tasks" style="display:none">
+    <div class="tasks-view">
+      <div class="tasks-header">
+        <div class="section-title">AUFGABEN</div>
+        <button class="btn-primary" id="btn-new-task">+ NEUE AUFGABE</button>
+      </div>
+      <div class="tasks-filters">
+        <button class="filter-chip active" data-filter="all">ALLE</button>
+        <button class="filter-chip" data-filter="open">OFFEN</button>
+        <button class="filter-chip" data-filter="overdue">ÜBERFÄLLIG</button>
+        <button class="filter-chip" data-filter="done">ERLEDIGT</button>
+        <button class="filter-chip" data-filter="critical">KRITISCH</button>
+      </div>
+      <div class="tasks-grid" id="tasks-grid"></div>
+    </div>
+  </div>
+
+  <!-- Calendar View -->
+  <div class="view" id="view-calendar" style="display:none">
+    <div class="calendar-view" id="calendar-view">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div class="section-title">KALENDER</div>
+        <button class="btn-primary" id="btn-google-auth">GOOGLE VERBINDEN</button>
+      </div>
+      <div id="calendar-events"></div>
+    </div>
+  </div>
+
+  <!-- Settings View -->
+  <div class="view" id="view-settings" style="display:none">
+    <div class="settings-view" id="settings-view"></div>
+  </div>
+
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<!-- Knowledge Base Modal -->
+<div class="modal-overlay" id="kb-modal" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">📚 WISSENSDATENBANK</div>
+      <button class="detail-close" id="kb-close">✕</button>
+    </div>
+    <div class="modal-body" id="kb-body"></div>
+    <div class="modal-footer">
+      <button class="btn-secondary" id="kb-export">EXPORTIEREN</button>
+      <button class="btn-primary" id="kb-add">+ EINTRAG HINZUFÜGEN</button>
+    </div>
+  </div>
+</div>
+
+<!-- Task Modal -->
+<div class="modal-overlay" id="task-modal" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="task-modal-title">NEUE AUFGABE</div>
+      <button class="detail-close" id="task-modal-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="task-form">
+        <label>TITEL
+          <input type="text" id="task-title-input" placeholder="Aufgabentitel...">
+        </label>
+        <label>KATEGORIE
+          <select id="task-cat-input">
+            <option value="REOS">REOS</option>
+            <option value="Personal">Personal</option>
+            <option value="Health">Health</option>
+            <option value="Finance">Finance</option>
+            <option value="Other">Sonstiges</option>
+          </select>
+        </label>
+        <label>PRIORITÄT
+          <select id="task-priority-input">
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+            <option value="high">High</option>
+            <option value="critical">Critical</option>
+          </select>
+        </label>
+        <label>DEADLINE
+          <input type="datetime-local" id="task-deadline-input">
+        </label>
+        <label>BESCHREIBUNG
+          <textarea id="task-desc-input" rows="3" placeholder="Optionale Beschreibung..."></textarea>
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" id="task-cancel">ABBRECHEN</button>
+      <button class="btn-primary" id="task-save">SPEICHERN</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>

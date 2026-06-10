@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="JARVIS">
+  <title>REOS JARVIS</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <div id="header">
+      <div class="brand">
+        <div class="arc-logo">⬡</div>
+        <div>
+          <div class="title">JARVIS</div>
+          <div class="subtitle">REOS INTELLIGENCE</div>
+        </div>
+      </div>
+      <div class="header-date" id="header-date"></div>
+    </div>
+
+    <!-- Tabs -->
+    <div id="tabs">
+      <button class="tab active" data-view="tasks">AUFGABEN</button>
+      <button class="tab" data-view="accountability">CHECK</button>
+      <button class="tab" data-view="calendar">KALENDER</button>
+    </div>
+
+    <!-- Views -->
+    <div id="content">
+      <!-- Tasks -->
+      <div class="view active" id="view-tasks">
+        <div class="section-header">
+          <span id="task-count">0 offene Aufgaben</span>
+          <button class="btn-small" id="btn-add-task">+ NEU</button>
+        </div>
+        <div id="task-list"></div>
+      </div>
+
+      <!-- Accountability -->
+      <div class="view" id="view-accountability" style="display:none">
+        <div class="accountability-panel">
+          <div class="acc-question">Arbeitest du gerade?</div>
+          <div class="acc-buttons">
+            <button class="acc-btn arbeiten" id="btn-arbeiten">ARBEITEN</button>
+            <button class="acc-btn versagen" id="btn-versagen">VERSAGEN</button>
+          </div>
+          <div class="acc-stats" id="acc-stats"></div>
+        </div>
+      </div>
+
+      <!-- Calendar -->
+      <div class="view" id="view-calendar" style="display:none">
+        <div id="calendar-list"><div class="empty-msg">Kalender-Sync über Desktop-App einrichten.</div></div>
+      </div>
+    </div>
+
+    <!-- Quick Add Task -->
+    <div id="quick-add" style="display:none">
+      <input type="text" id="quick-task-input" placeholder="Neue Aufgabe...">
+      <button id="quick-save">SPEICHERN</button>
+      <button id="quick-cancel">ABBRECHEN</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "REOS JARVIS",
+  "short_name": "JARVIS",
+  "description": "REOS Platform GmbH — Personal Intelligence System",
+  "start_url": "/pwa/",
+  "display": "standalone",
+  "background_color": "#020408",
+  "theme_color": "#C9A84C",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
