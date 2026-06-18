@@ -1167,6 +1167,46 @@ body::after {
 .event-title { font-size: 14px; color: var(--text); }
 .event-location { font-size: 12px; color: var(--text-dim); margin-top: 3px; }
 
+/* ═══ FILE PREVIEW BAR ═══ */
+#file-preview-bar {
+  padding: 6px 0 8px;
+  display: none;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ═══ LIVE CALL MODAL ═══ */
+#live-call-modal .modal {
+  box-shadow: 0 0 80px rgba(201,168,76,0.2);
+}
+
+#call-status-icon {
+  display: block;
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+#call-transcript-live {
+  min-height: 40px;
+  font-size: 13px;
+  color: var(--text-dim);
+  font-style: italic;
+  line-height: 1.6;
+  margin: 16px 0;
+}
+
+#call-jarvis-response {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.6;
+  background: var(--gold-dim);
+  border: 1px solid var(--gold-border);
+  border-left: 3px solid var(--gold);
+  padding: 12px 14px;
+  margin: 16px 0;
+  text-align: left;
+}
+
 /* Responsive tweak */
 @media (max-width: 1100px) {
   .sidebar { width: 220px; min-width: 220px; }

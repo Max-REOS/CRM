@@ -91,8 +91,13 @@
     <div class="chat-main">
       <div class="chat-messages" id="chat-messages"></div>
       <div class="chat-footer">
+        <!-- File preview bar -->
+        <div id="file-preview-bar" style="display:none;padding:6px 0 8px;display:none;flex-wrap:wrap;gap:6px"></div>
         <div class="input-row">
           <button class="icon-btn" id="btn-voice" title="Spracheingabe">🎤</button>
+          <button class="icon-btn" id="btn-attach" title="Datei anhängen">📎</button>
+          <button class="icon-btn" id="btn-live-call" title="Live-Gespräch starten">📞</button>
+          <input type="file" id="file-input" multiple accept=".pdf,.txt,.md,.docx,.xlsx,.csv,.png,.jpg,.jpeg" style="display:none">
           <textarea class="chat-input" id="chat-input" placeholder="Nachricht an JARVIS..." rows="1"></textarea>
           <button class="icon-btn" id="btn-send" title="Senden">▶</button>
         </div>
@@ -194,6 +199,26 @@
     <div class="modal-footer">
       <button class="btn-secondary" id="task-cancel">ABBRECHEN</button>
       <button class="btn-primary" id="task-save">SPEICHERN</button>
+    </div>
+  </div>
+</div>
+
+<!-- Live Call Modal -->
+<div class="modal-overlay" id="live-call-modal" style="display:none">
+  <div class="modal" style="width:420px;max-height:unset">
+    <div class="modal-header">
+      <div class="modal-title" id="call-title">📞 LIVE-GESPRÄCH</div>
+      <button class="detail-close" id="call-close">✕</button>
+    </div>
+    <div class="modal-body" style="text-align:center;padding:32px 20px">
+      <div id="call-status-icon" style="font-size:48px;margin-bottom:16px;animation:arc-pulse 2s infinite">📞</div>
+      <div id="call-status-text" style="font-family:var(--font-mono);font-size:13px;letter-spacing:2px;color:var(--gold);margin-bottom:8px">BEREIT</div>
+      <div id="call-transcript-live" style="font-size:13px;color:var(--text-dim);min-height:40px;margin:16px 0;line-height:1.6;font-style:italic"></div>
+      <div id="call-jarvis-response" style="font-size:13px;color:var(--text);min-height:40px;margin:16px 0;line-height:1.6;background:var(--gold-dim);border:1px solid var(--gold-border);padding:10px;display:none"></div>
+    </div>
+    <div class="modal-footer" style="justify-content:center;gap:16px">
+      <button class="btn-primary" id="call-speak-btn" style="padding:12px 28px;font-size:13px">🎤 SPRECHEN</button>
+      <button class="btn-secondary" id="call-end-btn" style="padding:12px 28px;font-size:13px;color:var(--red);border-color:rgba(255,110,110,0.3)">GESPRÄCH BEENDEN</button>
     </div>
   </div>
 </div>

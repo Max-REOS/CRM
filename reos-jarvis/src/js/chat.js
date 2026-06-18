@@ -91,6 +91,9 @@ let sessions = [];
 let currentSessionId = null;
 let isStreaming = false;
 
+// ── ATTACHED FILES ──
+let attachedFiles = [];
+
 async function initChat() {
   sessions = await window.jarvis.readData('sessions.json') || [];
   renderSessionList();
@@ -103,11 +106,212 @@ async function initChat() {
   });
   document.getElementById('chat-input').addEventListener('input', autoResizeTextarea);
 
+  // File attach
+  document.getElementById('btn-attach')?.addEventListener('click', () => {
+    document.getElementById('file-input').click();
+  });
+  document.getElementById('file-input')?.addEventListener('change', handleFileSelect);
+
+  // Live call
+  document.getElementById('btn-live-call')?.addEventListener('click', openLiveCall);
+
   if (sessions.length > 0) {
     loadSession(sessions[sessions.length - 1].id);
   } else {
     showEmptyState();
   }
+}
+
+// ── FILE UPLOAD ──
+async function handleFileSelect(e) {
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+
+  const bar = document.getElementById('file-preview-bar');
+  bar.style.display = 'flex';
+
+  for (const file of files) {
+    const text = await readFileAsText(file);
+    attachedFiles.push({ name: file.name, content: text, type: file.type });
+
+    const chip = document.createElement('div');
+    chip.style.cssText = 'display:flex;align-items:center;gap:6px;padding:4px 10px;background:var(--gold-dim);border:1px solid var(--gold-border);font-family:var(--font-mono);font-size:10px;color:var(--gold)';
+    chip.innerHTML = `📄 ${file.name} <span style="cursor:pointer;color:var(--text-dim)" data-name="${file.name}">✕</span>`;
+    chip.querySelector('span').addEventListener('click', () => {
+      attachedFiles = attachedFiles.filter(f => f.name !== file.name);
+      chip.remove();
+      if (attachedFiles.length === 0) bar.style.display = 'none';
+    });
+    bar.appendChild(chip);
+  }
+  e.target.value = '';
+  showToast(`${files.length} Datei(en) angehängt.`, 'success');
+}
+
+function readFileAsText(file) {
+  return new Promise((resolve) => {
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = () => resolve(`[Bild: ${file.name}]`);
+      reader.readAsDataURL(file);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target.result);
+    reader.onerror = () => resolve(`[Fehler beim Lesen: ${file.name}]`);
+    reader.readAsText(file, 'UTF-8');
+  });
+}
+
+// ── LIVE CALL ──
+let callRecognition = null;
+let callTranscript = [];
+let callActive = false;
+
+function openLiveCall() {
+  const modal = document.getElementById('live-call-modal');
+  modal.style.display = 'flex';
+  callTranscript = [];
+  callActive = true;
+
+  document.getElementById('call-status-text').textContent = 'BEREIT — DRÜCKE SPRECHEN';
+  document.getElementById('call-transcript-live').textContent = '';
+  document.getElementById('call-jarvis-response').style.display = 'none';
+
+  document.getElementById('call-speak-btn').onclick = startCallTurn;
+  document.getElementById('call-end-btn').onclick = endLiveCall;
+  document.getElementById('call-close').onclick = endLiveCall;
+}
+
+function startCallTurn() {
+  if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+    showToast('Spracheingabe nicht unterstützt.', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('call-speak-btn');
+  btn.textContent = '🔴 AUFNAHME...';
+  btn.disabled = true;
+  document.getElementById('call-status-text').textContent = 'SPRECHE...';
+  document.getElementById('call-transcript-live').textContent = '';
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  callRecognition = new SR();
+  callRecognition.lang = 'de-DE';
+  callRecognition.continuous = false;
+  callRecognition.interimResults = true;
+
+  callRecognition.onresult = (e) => {
+    const transcript = Array.from(e.results).map(r => r[0].transcript).join('');
+    document.getElementById('call-transcript-live').textContent = transcript;
+
+    if (e.results[e.results.length - 1].isFinal) {
+      callRecognition.stop();
+      handleCallInput(transcript);
+    }
+  };
+
+  callRecognition.onerror = () => {
+    btn.textContent = '🎤 SPRECHEN';
+    btn.disabled = false;
+    document.getElementById('call-status-text').textContent = 'FEHLER — NOCHMAL VERSUCHEN';
+  };
+
+  callRecognition.start();
+}
+
+async function handleCallInput(userText) {
+  if (!userText.trim()) return;
+  callTranscript.push({ role: 'user', content: userText });
+
+  document.getElementById('call-status-text').textContent = 'JARVIS DENKT...';
+  document.getElementById('call-status-icon').textContent = '⚙️';
+
+  const apiKey = await window.jarvis.getStore('anthropic-api-key');
+  const model = await window.jarvis.getStore('model') || 'claude-sonnet-4-5-20250929';
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 300,
+        system: buildSystemPrompt([], []) + '\n\nDu bist gerade in einem Live-Gespräch per Sprache. Antworte KURZ (max 2-3 Sätze), klar, direkt. Kein Markdown.',
+        messages: callTranscript.slice(-10)
+      })
+    });
+
+    const data = await response.json();
+    const reply = data.content?.[0]?.text || 'Keine Antwort.';
+    callTranscript.push({ role: 'assistant', content: reply });
+
+    const replyEl = document.getElementById('call-jarvis-response');
+    replyEl.textContent = reply;
+    replyEl.style.display = 'block';
+    document.getElementById('call-status-text').textContent = 'JARVIS SPRICHT...';
+    document.getElementById('call-status-icon').textContent = '🔊';
+
+    // Speak reply
+    if (typeof speakText === 'function') {
+      speakText(reply);
+      // Wait for speech to finish then re-enable button
+      const estimatedDuration = reply.length * 60;
+      setTimeout(() => {
+        if (!callActive) return;
+        document.getElementById('call-speak-btn').textContent = '🎤 SPRECHEN';
+        document.getElementById('call-speak-btn').disabled = false;
+        document.getElementById('call-status-text').textContent = 'DEINE RUNDE';
+        document.getElementById('call-status-icon').textContent = '📞';
+      }, estimatedDuration);
+    } else {
+      document.getElementById('call-speak-btn').textContent = '🎤 SPRECHEN';
+      document.getElementById('call-speak-btn').disabled = false;
+      document.getElementById('call-status-text').textContent = 'DEINE RUNDE';
+    }
+  } catch (err) {
+    showToast('Fehler: ' + err.message, 'error');
+    document.getElementById('call-speak-btn').textContent = '🎤 SPRECHEN';
+    document.getElementById('call-speak-btn').disabled = false;
+  }
+}
+
+async function endLiveCall() {
+  callActive = false;
+  if (callRecognition) callRecognition.stop();
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+
+  document.getElementById('live-call-modal').style.display = 'none';
+
+  if (callTranscript.length === 0) return;
+
+  // Save transcript as chat session
+  const summary = callTranscript.map(m => `**${m.role === 'user' ? 'MAX' : 'JARVIS'}:** ${m.content}`).join('\n\n');
+  const sessionTitle = `📞 Live-Gespräch ${new Date().toLocaleDateString('de-DE')}`;
+
+  const sessionId = `session_call_${Date.now()}`;
+  sessions.push({
+    id: sessionId,
+    title: sessionTitle,
+    messages: [
+      ...callTranscript,
+      { role: 'assistant', content: `[Zusammenfassung des Live-Gesprächs]\n\n${summary}` }
+    ],
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    category: 'ORGANISATION',
+    isCallSession: true
+  });
+
+  await window.jarvis.writeData('sessions.json', sessions);
+  renderSessionList();
+  loadSession(sessionId);
+  switchView('chat');
+  showToast('Gespräch gespeichert.', 'success');
 }
 
 function autoResizeTextarea() {
@@ -212,13 +416,25 @@ function formatMessage(text) {
 async function sendMessage() {
   if (isStreaming) return;
   const input = document.getElementById('chat-input');
-  const text = input.value.trim();
-  if (!text) return;
+  let text = input.value.trim();
+  if (!text && attachedFiles.length === 0) return;
 
   const apiKey = await window.jarvis.getStore('anthropic-api-key');
   if (!apiKey) {
     showToast('Kein Anthropic API-Key. Bitte unter Einstellungen hinterlegen.', 'error');
     return;
+  }
+
+  // Append file contents to message
+  if (attachedFiles.length > 0) {
+    const fileContext = attachedFiles.map(f =>
+      `\n\n[ANHANG: ${f.name}]\n${f.content.slice(0, 8000)}`
+    ).join('');
+    text = (text || 'Bitte analysiere diese Datei(en):') + fileContext;
+    attachedFiles = [];
+    const bar = document.getElementById('file-preview-bar');
+    bar.style.display = 'none';
+    bar.innerHTML = '';
   }
 
   input.value = '';
