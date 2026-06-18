@@ -51,22 +51,53 @@ function stopListening() {
   recognition.stop();
 }
 
+// Priority list of JARVIS-like Microsoft voices (male, calm, English)
+const JARVIS_VOICE_PRIORITY = [
+  'Microsoft David Desktop - English (United States)',
+  'Microsoft Mark Desktop - English (United States)',
+  'Microsoft David - English (United States)',
+  'Microsoft Mark - English (United States)',
+  'Microsoft Guy Online (Natural) - English (United States)',
+  'Microsoft Christopher Online (Natural) - English (United States)',
+  'Microsoft Eric Online (Natural) - English (United States)',
+  'Microsoft Ryan Online (Natural) - English (United Kingdom)',
+  'Microsoft George - English (United Kingdom)',
+];
+
+function getBestVoice() {
+  const voices = synth.getVoices();
+  for (const name of JARVIS_VOICE_PRIORITY) {
+    const v = voices.find(v => v.name === name);
+    if (v) return v;
+  }
+  // Fallback: any English male-sounding voice
+  return voices.find(v => v.lang.startsWith('en') && !v.name.includes('Female') && !v.name.includes('Zira') && !v.name.includes('Hazel'))
+    || voices.find(v => v.lang.startsWith('en'))
+    || voices[0];
+}
+
 function speakText(text) {
   if (!synth) return;
-  // Remove markdown
   const clean = text.replace(/[*_`#\[\]]/g, '').replace(/<[^>]*>/g, '').slice(0, 500);
   synth.cancel();
   const utterance = new SpeechSynthesisUtterance(clean);
-  utterance.lang = 'de-DE';
-  utterance.rate = 0.95;
-  utterance.pitch = 0.85;
+  utterance.lang = 'en-US';
+  utterance.rate = 0.88;
+  utterance.pitch = 0.78;
+  utterance.volume = 1;
 
-  // Prefer a German voice
-  const voices = synth.getVoices();
-  const deVoice = voices.find(v => v.lang.startsWith('de'));
-  if (deVoice) utterance.voice = deVoice;
+  const setVoiceAndSpeak = () => {
+    const voice = getBestVoice();
+    if (voice) utterance.voice = voice;
+    synth.speak(utterance);
+  };
 
-  synth.speak(utterance);
+  // Voices may not be loaded yet
+  if (synth.getVoices().length === 0) {
+    synth.addEventListener('voiceschanged', setVoiceAndSpeak, { once: true });
+  } else {
+    setVoiceAndSpeak();
+  }
 }
 
 // Init on DOMContentLoaded
