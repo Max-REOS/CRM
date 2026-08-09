@@ -1,0 +1,53 @@
+name: Reonobilis – Daily Lead Scrape
+
+# NOTE: this workflow lives at the CRM repo root (with a scoped
+# working-directory) only because the Reonobilis app currently lives in the
+# reonobilis-lead-engine/ subfolder of this repo. If/when that folder is
+# extracted into its own repository, move this file to
+# <new-repo>/.github/workflows/daily-scrape.yml and drop the
+# working-directory / cache-dependency-path prefixes.
+
+on:
+  schedule:
+    # ~06:00 Europe/Berlin (CET). Shifts to ~07:00 local time during CEST
+    # (summer) since cron here runs in UTC and we don't special-case DST.
+    - cron: '0 5 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: reonobilis-lead-engine
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: reonobilis-lead-engine/package-lock.json
+
+      - run: npm ci
+
+      - run: npx playwright install --with-deps chromium
+
+      - run: npm run scrape
+
+      - name: Commit updated lead database
+        run: |
+          git config user.name "reonobilis-bot"
+          git config user.email "reonobilis-bot@users.noreply.github.com"
+          git add data/reonobilis.db
+          git diff --cached --quiet || git commit -m "chore(reonobilis): daily lead scrape $(date -u +%Y-%m-%d)"
+          git push
+
+      - name: Trigger redeploy (optional)
+        if: ${{ env.VERCEL_DEPLOY_HOOK_URL != '' }}
+        env:
+          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: curl -fsS -X POST "$VERCEL_DEPLOY_HOOK_URL"
